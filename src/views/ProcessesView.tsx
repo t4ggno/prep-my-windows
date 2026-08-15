@@ -11,18 +11,22 @@ import type { ProcessInfo, ProcessRule } from "@/types";
 
 export function ProcessesView({
   rules,
+  mutedRuleIds,
   processes,
   loadingProcesses,
   onLoadProcesses,
   onToggle,
+  onNotificationsMuted,
   onAdd,
   onRemove,
 }: {
   rules: ProcessRule[];
+  mutedRuleIds: string[];
   processes: ProcessInfo[];
   loadingProcesses: boolean;
   onLoadProcesses: () => void;
   onToggle: (id: string, enabled: boolean) => void;
+  onNotificationsMuted: (id: string, muted: boolean) => void;
   onAdd: (process: { name: string; executableName: string; executablePath: string | null }) => void;
   onRemove: (id: string) => void;
 }) {
@@ -84,7 +88,8 @@ export function ProcessesView({
         <div className="data-header process-grid">
           <span>Rule</span>
           <span>Executable</span>
-          <span />
+          <span>Notify</span>
+          <span>Stop</span>
           <span />
         </div>
         {filteredRules.map((rule) => (
@@ -97,6 +102,11 @@ export function ProcessesView({
               <code className="block truncate">{rule.executableName}</code>
               {rule.executablePath && <div className="row-secondary truncate">{rule.executablePath}</div>}
             </div>
+            <Switch
+              checked={!mutedRuleIds.includes(rule.id)}
+              onCheckedChange={(notify) => onNotificationsMuted(rule.id, !notify)}
+              aria-label={`Notify when ${rule.name} is stopped`}
+            />
             <Switch
               checked={rule.enabled}
               onCheckedChange={(enabled) => onToggle(rule.id, enabled)}

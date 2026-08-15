@@ -6,9 +6,10 @@ use uuid::Uuid;
 use crate::catalog;
 use crate::engine;
 use crate::models::{
-    AddProcessRuleRequest, AppConfig, AutostartEntry, LiveState, NetworkView, PackageView,
-    PolicyView, RuntimeSettings, ScheduledTaskView, Snapshot,
+    AddProcessRuleRequest, AppConfig, AutostartEntry, NetworkView, PackageView, PolicyView,
+    RuntimeSettings, ScheduledTaskView, Snapshot,
 };
+use crate::process_enforcement;
 use crate::state::AppState;
 use crate::windows::{
     autostart, hosts, packages, processes, registry, startup_task, system_settings, tasks,
@@ -20,14 +21,6 @@ pub async fn get_snapshot(state: tauri::State<'_, AppState>) -> Result<Snapshot,
     tauri::async_runtime::spawn_blocking(move || build_snapshot(&state))
         .await
         .map_err(|error| format!("Could not load application state: {error}"))?
-}
-
-#[tauri::command]
-pub fn get_live_state(state: tauri::State<'_, AppState>) -> LiveState {
-    LiveState {
-        status: state.status(),
-        activity: state.activity(),
-    }
 }
 
 fn build_snapshot(state: &AppState) -> Result<Snapshot, String> {
@@ -192,7 +185,7 @@ fn replace_profile(state: &AppState, config: AppConfig) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn set_catalog_item(
+pub async fn set_catalog_item(
     state: tauri::State<'_, AppState>,
     section: String,
     id: String,
@@ -220,11 +213,33 @@ pub fn set_catalog_item(
             _ => unreachable!(),
         };
         values.insert(id, enabled);
-    })
+    })?;
+
+    let state = state.inner().clone();
+    match section.as_str() {
+        "policies" if enabled => {
+            tauri::async_runtime::spawn_blocking(move || engine::enforce_runtime(&state))
+                .await
+                .map_err(|error| format!("Could not apply policy: {error}"))??
+        }
+        "networkBlocks" => {
+            tauri::async_runtime::spawn_blocking(move || engine::enforce_runtime(&state))
+                .await
+                .map_err(|error| format!("Could not apply network rules: {error}"))??
+        }
+        "packages" | "scheduledTasks" if enabled => {
+            tauri::async_runtime::spawn_blocking(move || engine::enforce_slow(&state))
+                .await
+                .map_err(|error| format!("Could not apply rule: {error}"))??
+        }
+        _ => 0,
+    };
+    Ok(())
 }
 
 #[tauri::command]
-pub fn set_process_rule_enabled(
+pub async fn set_process_rule_enabled(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     id: String,
     enabled: bool,
@@ -237,11 +252,38 @@ pub fn set_process_rule_enabled(
             .ok_or_else(|| "Unknown process rule".to_owned())?;
         rule.enabled = enabled;
         Ok(())
+    })?;
+    if enabled {
+        let state = state.inner().clone();
+        tauri::async_runtime::spawn_blocking(move || process_enforcement::enforce(&app, &state))
+            .await
+            .map_err(|error| format!("Could not apply process rule: {error}"))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_process_rule_notifications_muted(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    muted: bool,
+) -> Result<(), String> {
+    state.try_update_config(|config| {
+        if !config.process_rules.iter().any(|rule| rule.id == id) {
+            return Err("Unknown process rule".to_owned());
+        }
+        if muted {
+            config.muted_process_notifications.insert(id);
+        } else {
+            config.muted_process_notifications.remove(&id);
+        }
+        Ok(())
     })
 }
 
 #[tauri::command]
-pub fn add_process_rule(
+pub async fn add_process_rule(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     request: AddProcessRuleRequest,
 ) -> Result<(), String> {
@@ -265,12 +307,20 @@ pub fn add_process_rule(
             enabled: true,
             built_in: false,
         });
-    })
+    })?;
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || process_enforcement::enforce(&app, &state))
+        .await
+        .map_err(|error| format!("Could not apply process rule: {error}"))?;
+    Ok(())
 }
 
 #[tauri::command]
 pub fn remove_process_rule(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
-    state.update_config(|config| config.process_rules.retain(|rule| rule.id != id))
+    state.update_config(|config| {
+        config.process_rules.retain(|rule| rule.id != id);
+        config.muted_process_notifications.remove(&id);
+    })
 }
 
 #[tauri::command]
@@ -348,7 +398,7 @@ pub fn remove_custom_package(
 }
 
 #[tauri::command]
-pub fn update_runtime_settings(
+pub async fn update_runtime_settings(
     state: tauri::State<'_, AppState>,
     settings: RuntimeSettings,
 ) -> Result<(), String> {
@@ -357,8 +407,6 @@ pub fn update_runtime_settings(
     let start_with_windows = settings.start_with_windows;
     startup_task::configure(start_with_windows)?;
     if let Err(error) = state.update_config(|config| {
-        config.enforcement_interval_seconds = settings.enforcement_interval_seconds;
-        config.package_interval_minutes = settings.package_interval_minutes;
         config.start_with_windows = start_with_windows;
         config.active_hours_start = settings.active_hours_start;
         config.active_hours_end = settings.active_hours_end;
@@ -372,20 +420,35 @@ pub fn update_runtime_settings(
         }
         return Err(error);
     }
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || engine::enforce_runtime(&state))
+        .await
+        .map_err(|error| format!("Could not apply settings: {error}"))??;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn enforce_now(state: tauri::State<'_, AppState>) -> Result<u64, String> {
+pub async fn enforce_now(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<u64, String> {
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&state))
+    tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&app, &state))
         .await
         .map_err(|error| format!("Could not enforce policy: {error}"))?
 }
 
 #[tauri::command]
-pub fn reset_profile(state: tauri::State<'_, AppState>) -> Result<(), String> {
-    replace_profile(&state, AppConfig::default())
+pub async fn reset_profile(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    replace_profile(&state, AppConfig::default())?;
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&app, &state))
+        .await
+        .map_err(|error| format!("Could not apply profile: {error}"))??;
+    Ok(())
 }
 
 #[tauri::command]
@@ -397,12 +460,21 @@ pub fn export_profile(state: tauri::State<'_, AppState>, path: String) -> Result
 }
 
 #[tauri::command]
-pub fn import_profile(state: tauri::State<'_, AppState>, path: String) -> Result<(), String> {
+pub async fn import_profile(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    path: String,
+) -> Result<(), String> {
     let content = fs::read_to_string(PathBuf::from(path))
         .map_err(|error| format!("Could not read profile: {error}"))?;
     let config: AppConfig = serde_json::from_str(&content)
         .map_err(|error| format!("Could not parse profile: {error}"))?;
-    replace_profile(&state, config)
+    replace_profile(&state, config)?;
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&app, &state))
+        .await
+        .map_err(|error| format!("Could not apply profile: {error}"))??;
+    Ok(())
 }
 
 #[tauri::command]

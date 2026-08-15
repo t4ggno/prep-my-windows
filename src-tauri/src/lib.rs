@@ -1,7 +1,9 @@
 mod catalog;
 mod commands;
 mod engine;
+mod events;
 mod models;
+mod process_enforcement;
 mod state;
 mod windows;
 
@@ -38,9 +40,10 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main_window(app),
             "enforce" => {
+                let app = app.clone();
                 let state = app.state::<AppState>().inner().clone();
                 tauri::async_runtime::spawn_blocking(move || {
-                    let _ = engine::enforce_all(&state);
+                    let _ = engine::enforce_all(&app, &state);
                 });
             }
             "quit" => app.exit(0),
@@ -99,14 +102,14 @@ pub fn run() -> tauri::Result<()> {
             if !background {
                 show_main_window(app.handle());
             }
-            engine::start(state);
+            engine::start(app.handle().clone(), state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
-            commands::get_live_state,
             commands::set_catalog_item,
             commands::set_process_rule_enabled,
+            commands::set_process_rule_notifications_muted,
             commands::add_process_rule,
             commands::remove_process_rule,
             commands::list_processes,

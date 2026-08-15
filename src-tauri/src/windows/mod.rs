@@ -1,5 +1,6 @@
 pub mod autostart;
 pub mod hosts;
+pub mod notifications;
 pub mod packages;
 pub mod processes;
 pub mod registry;

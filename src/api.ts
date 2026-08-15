@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AutostartEntry,
   CatalogSection,
-  LiveState,
   ProcessInfo,
   RuntimeSettings,
   Snapshot,
@@ -10,11 +9,12 @@ import type {
 
 export const api = {
   snapshot: () => invoke<Snapshot>("get_snapshot"),
-  liveState: () => invoke<LiveState>("get_live_state"),
   setCatalogItem: (section: CatalogSection, id: string, enabled: boolean) =>
     invoke<void>("set_catalog_item", { section, id, enabled }),
   setProcessRuleEnabled: (id: string, enabled: boolean) =>
     invoke<void>("set_process_rule_enabled", { id, enabled }),
+  setProcessRuleNotificationsMuted: (id: string, muted: boolean) =>
+    invoke<void>("set_process_rule_notifications_muted", { id, muted }),
   addProcessRule: (request: {
     name: string;
     executableName: string;

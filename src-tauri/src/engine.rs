@@ -1,11 +1,18 @@
 use std::time::Duration;
 
+use tauri::AppHandle;
+
 use crate::catalog;
-use crate::models::{ProcessRule, SupportRequirement, SystemSupport};
+use crate::events::publish_live_state;
+use crate::models::{SupportRequirement, SystemSupport};
+use crate::process_enforcement;
 use crate::state::AppState;
 use crate::windows::{
-    self, autostart, hosts, packages, processes, registry, startup_task, system_settings, tasks,
+    self, autostart, hosts, packages, registry, startup_task, system_settings, tasks,
 };
+
+const RUNTIME_RECONCILIATION_INTERVAL: Duration = Duration::from_secs(60 * 60);
+const SLOW_RECONCILIATION_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 struct BusyGuard(AppState);
 
@@ -170,21 +177,6 @@ pub fn enforce_runtime(state: &AppState) -> Result<u64, String> {
     enforce_runtime_inner(state).complete(state)
 }
 
-pub fn enforce_processes(state: &AppState) -> u64 {
-    let rules = state
-        .config()
-        .process_rules
-        .into_iter()
-        .filter(|rule| rule.enabled)
-        .collect::<Vec<ProcessRule>>();
-    let killed = processes::enforce(&rules);
-    if !killed.is_empty() {
-        state.add_activity("Process", format!("Stopped {}", killed.join(", ")), true);
-        state.record_kills(killed.len() as u64);
-    }
-    killed.len() as u64
-}
-
 fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
     let config = state.config();
     let mut repaired = 0_u64;
@@ -258,52 +250,66 @@ pub fn enforce_slow(state: &AppState) -> Result<u64, String> {
     enforce_slow_inner(state).complete(state)
 }
 
-pub fn enforce_all(state: &AppState) -> Result<u64, String> {
+pub fn enforce_all(app: &AppHandle, state: &AppState) -> Result<u64, String> {
     let _guard = BusyGuard::acquire(state)?;
     let mut outcome = enforce_runtime_inner(state);
-    let killed = enforce_processes(state);
+    let killed = process_enforcement::enforce(app, state);
     outcome.merge(enforce_slow_inner(state));
-    outcome.complete(state).map(|repaired| repaired + killed)
+    let result = outcome.complete(state).map(|repaired| repaired + killed);
+    publish_live_state(app, state);
+    result
 }
 
-pub fn start(state: AppState) {
+pub fn start(app: AppHandle, state: AppState) {
+    let ready_receiver = process_enforcement::start_monitor(app.clone(), state.clone());
+
+    let initial_app = app.clone();
     let initial_state = state.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let _ = enforce_all(&initial_state);
-    });
-
-    let process_state = state.clone();
     tauri::async_runtime::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            let state = process_state.clone();
-            let _ = tauri::async_runtime::spawn_blocking(move || enforce_processes(&state)).await;
-        }
+        let _ = tokio::time::timeout(Duration::from_secs(10), ready_receiver).await;
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            let _ = enforce_all(&initial_app, &initial_state);
+        })
+        .await;
     });
 
+    let runtime_app = app.clone();
     let runtime_state = state.clone();
     tauri::async_runtime::spawn(async move {
         loop {
-            let interval = runtime_state.config().enforcement_interval_seconds;
-            tokio::time::sleep(Duration::from_secs(interval)).await;
+            tokio::time::sleep(RUNTIME_RECONCILIATION_INTERVAL).await;
+            let app = runtime_app.clone();
             let state = runtime_state.clone();
-            let _ = tauri::async_runtime::spawn_blocking(move || enforce_runtime(&state)).await;
+            let _ = tauri::async_runtime::spawn_blocking(move || {
+                let result = enforce_runtime(&state);
+                publish_live_state(&app, &state);
+                result
+            })
+            .await;
         }
     });
 
+    let slow_app = app;
     tauri::async_runtime::spawn(async move {
         loop {
-            let interval = state.config().package_interval_minutes;
-            tokio::time::sleep(Duration::from_secs(interval * 60)).await;
+            tokio::time::sleep(SLOW_RECONCILIATION_INTERVAL).await;
+            let app = slow_app.clone();
             let state = state.clone();
-            let _ = tauri::async_runtime::spawn_blocking(move || enforce_slow(&state)).await;
+            let _ = tauri::async_runtime::spawn_blocking(move || {
+                let result = enforce_slow(&state);
+                publish_live_state(&app, &state);
+                result
+            })
+            .await;
         }
     });
 }
 
 #[cfg(test)]
 mod tests {
-    use super::EnforcementOutcome;
+    use super::{
+        EnforcementOutcome, RUNTIME_RECONCILIATION_INTERVAL, SLOW_RECONCILIATION_INTERVAL,
+    };
 
     #[test]
     fn combined_enforcement_keeps_earlier_errors() {
@@ -318,5 +324,11 @@ mod tests {
 
         assert_eq!(combined.repaired, 5);
         assert_eq!(combined.errors, ["runtime error"]);
+    }
+
+    #[test]
+    fn recurring_integrity_checks_are_low_frequency() {
+        assert_eq!(RUNTIME_RECONCILIATION_INTERVAL.as_secs(), 60 * 60);
+        assert_eq!(SLOW_RECONCILIATION_INTERVAL.as_secs(), 24 * 60 * 60);
     }
 }

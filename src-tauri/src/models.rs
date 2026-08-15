@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -252,10 +252,10 @@ pub struct AppConfig {
     pub network_blocks: BTreeMap<String, bool>,
     pub scheduled_tasks: BTreeMap<String, bool>,
     pub process_rules: Vec<ProcessRule>,
+    #[serde(default)]
+    pub muted_process_notifications: BTreeSet<String>,
     pub custom_packages: Vec<String>,
     pub blocked_autostarts: Vec<AutostartRule>,
-    pub enforcement_interval_seconds: u64,
-    pub package_interval_minutes: u64,
     pub start_with_windows: bool,
     #[serde(default = "default_active_hours_start")]
     pub active_hours_start: u8,
@@ -265,12 +265,7 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn validate(&self) -> Result<(), String> {
-        validate_runtime_intervals(
-            self.enforcement_interval_seconds,
-            self.package_interval_minutes,
-            self.active_hours_start,
-            self.active_hours_end,
-        )
+        validate_active_hours(self.active_hours_start, self.active_hours_end)
     }
 }
 
@@ -405,8 +400,6 @@ pub struct LiveState {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeSettings {
-    pub enforcement_interval_seconds: u64,
-    pub package_interval_minutes: u64,
     pub start_with_windows: bool,
     pub active_hours_start: u8,
     pub active_hours_end: u8,
@@ -414,27 +407,11 @@ pub struct RuntimeSettings {
 
 impl RuntimeSettings {
     pub fn validate(&self) -> Result<(), String> {
-        validate_runtime_intervals(
-            self.enforcement_interval_seconds,
-            self.package_interval_minutes,
-            self.active_hours_start,
-            self.active_hours_end,
-        )
+        validate_active_hours(self.active_hours_start, self.active_hours_end)
     }
 }
 
-fn validate_runtime_intervals(
-    enforcement_interval_seconds: u64,
-    package_interval_minutes: u64,
-    active_hours_start: u8,
-    active_hours_end: u8,
-) -> Result<(), String> {
-    if !(2..=3600).contains(&enforcement_interval_seconds) {
-        return Err("Enforcement interval must be between 2 and 3600 seconds".to_owned());
-    }
-    if !(1..=1440).contains(&package_interval_minutes) {
-        return Err("Package interval must be between 1 and 1440 minutes".to_owned());
-    }
+fn validate_active_hours(active_hours_start: u8, active_hours_end: u8) -> Result<(), String> {
     if active_hours_start > 23 || active_hours_end > 23 {
         return Err("Active hours must be between 0 and 23".to_owned());
     }

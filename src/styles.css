@@ -536,7 +536,7 @@ button:disabled {
 }
 
 .process-grid {
-  grid-template-columns: minmax(175px, 0.58fr) minmax(270px, 1fr) 36px 36px;
+  grid-template-columns: minmax(175px, 0.58fr) minmax(270px, 1fr) 52px 52px 36px;
 }
 
 .network-grid {

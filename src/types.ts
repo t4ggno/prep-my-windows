@@ -129,10 +129,9 @@ export interface AppSettings {
   networkBlocks: Record<string, boolean>;
   scheduledTasks: Record<string, boolean>;
   processRules: ProcessRule[];
+  mutedProcessNotifications: string[];
   customPackages: string[];
   blockedAutostarts: AutostartRule[];
-  enforcementIntervalSeconds: number;
-  packageIntervalMinutes: number;
   startWithWindows: boolean;
   activeHoursStart: number;
   activeHoursEnd: number;
@@ -156,8 +155,6 @@ export interface LiveState {
 }
 
 export interface RuntimeSettings {
-  enforcementIntervalSeconds: number;
-  packageIntervalMinutes: number;
   startWithWindows: boolean;
   activeHoursStart: number;
   activeHoursEnd: number;

@@ -22,8 +22,6 @@ export function SettingsView({
   onReset: () => void;
 }) {
   const [values, setValues] = useState<RuntimeSettings>({
-    enforcementIntervalSeconds: settings.enforcementIntervalSeconds,
-    packageIntervalMinutes: settings.packageIntervalMinutes,
     startWithWindows: settings.startWithWindows,
     activeHoursStart: settings.activeHoursStart,
     activeHoursEnd: settings.activeHoursEnd,
@@ -31,8 +29,6 @@ export function SettingsView({
 
   useEffect(() => {
     setValues({
-      enforcementIntervalSeconds: settings.enforcementIntervalSeconds,
-      packageIntervalMinutes: settings.packageIntervalMinutes,
       startWithWindows: settings.startWithWindows,
       activeHoursStart: settings.activeHoursStart,
       activeHoursEnd: settings.activeHoursEnd,
@@ -44,42 +40,6 @@ export function SettingsView({
       <ViewHeader title="Settings" />
       <section className="settings-card">
         <div className="section-label">Enforcement</div>
-        <label className="settings-row">
-          <span>Settings interval</span>
-          <div className="number-input">
-            <Input
-              type="number"
-              min={2}
-              max={3600}
-              value={values.enforcementIntervalSeconds}
-              onChange={(event) =>
-                setValues((current) => ({
-                  ...current,
-                  enforcementIntervalSeconds: Number(event.target.value),
-                }))
-              }
-            />
-            <span>seconds</span>
-          </div>
-        </label>
-        <label className="settings-row">
-          <span>Apps interval</span>
-          <div className="number-input">
-            <Input
-              type="number"
-              min={1}
-              max={1440}
-              value={values.packageIntervalMinutes}
-              onChange={(event) =>
-                setValues((current) => ({
-                  ...current,
-                  packageIntervalMinutes: Number(event.target.value),
-                }))
-              }
-            />
-            <span>minutes</span>
-          </div>
-        </label>
         <label className="settings-row">
           <span>Active hours start</span>
           <div className="number-input">

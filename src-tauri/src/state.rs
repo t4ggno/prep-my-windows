@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -35,6 +36,7 @@ struct Inner {
     config: RwLock<AppConfig>,
     status: RwLock<EngineStatus>,
     activity: RwLock<Vec<ActivityEvent>>,
+    process_allowances: RwLock<HashSet<String>>,
     busy: AtomicBool,
 }
 
@@ -62,6 +64,7 @@ impl AppState {
                     ..EngineStatus::default()
                 }),
                 activity: RwLock::new(Vec::new()),
+                process_allowances: RwLock::new(HashSet::new()),
                 busy: AtomicBool::new(false),
             }),
         };
@@ -161,6 +164,18 @@ impl AppState {
     pub fn clear_activity(&self) {
         self.inner.activity.write().clear();
     }
+
+    pub fn allow_process_once(&self, process_key: String) {
+        self.inner.process_allowances.write().insert(process_key);
+    }
+
+    pub fn consume_process_allowance(&self, process_key: &str) -> bool {
+        self.inner.process_allowances.write().remove(process_key)
+    }
+
+    pub fn revoke_process_allowance(&self, process_key: &str) {
+        self.inner.process_allowances.write().remove(process_key);
+    }
 }
 
 #[cfg(test)]
@@ -222,23 +237,45 @@ mod tests {
     }
 
     #[test]
-    fn rejects_invalid_runtime_intervals_without_changing_state() {
+    fn process_notification_preferences_survive_reload() {
         let directory = temporary_directory();
         let state = AppState::load(&directory).unwrap();
-        let original = state.config();
+        state
+            .update_config(|config| {
+                config
+                    .muted_process_notifications
+                    .insert("built-in-teams".to_owned());
+                config.process_rules[0].enabled = false;
+            })
+            .unwrap();
 
-        let error = state
-            .update_config(|config| config.enforcement_interval_seconds = 1)
-            .unwrap_err();
+        let reloaded = AppState::load(&directory).unwrap().config();
+        assert!(
+            reloaded
+                .muted_process_notifications
+                .contains("built-in-teams")
+        );
+        assert!(
+            reloaded
+                .process_rules
+                .iter()
+                .find(|rule| rule.id == "built-in-teams")
+                .unwrap()
+                .enabled
+        );
+        assert!(!reloaded.process_rules[0].enabled);
+        fs::remove_dir_all(directory).unwrap();
+    }
 
-        assert_eq!(
-            error,
-            "Enforcement interval must be between 2 and 3600 seconds"
-        );
-        assert_eq!(
-            state.config().enforcement_interval_seconds,
-            original.enforcement_interval_seconds
-        );
+    #[test]
+    fn process_allowances_are_consumed_once() {
+        let directory = temporary_directory();
+        let state = AppState::load(&directory).unwrap();
+
+        state.allow_process_once("app.exe".to_owned());
+
+        assert!(state.consume_process_allowance("app.exe"));
+        assert!(!state.consume_process_allowance("app.exe"));
         fs::remove_dir_all(directory).unwrap();
     }
 

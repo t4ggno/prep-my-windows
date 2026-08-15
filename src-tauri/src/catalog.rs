@@ -1373,10 +1373,9 @@ impl Default for AppConfig {
                 .map(|item| (item.id.to_owned(), true))
                 .collect::<BTreeMap<_, _>>(),
             process_rules: default_process_rules(),
+            muted_process_notifications: Default::default(),
             custom_packages: Vec::new(),
             blocked_autostarts: Vec::new(),
-            enforcement_interval_seconds: 10,
-            package_interval_minutes: 10,
             start_with_windows: true,
             active_hours_start: DEFAULT_ACTIVE_HOURS_START,
             active_hours_end: DEFAULT_ACTIVE_HOURS_END,

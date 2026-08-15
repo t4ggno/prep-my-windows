@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, LoaderCircle, X } from "lucide-react";
 import { api } from "@/api";
@@ -15,6 +16,7 @@ import { SettingsView } from "@/views/SettingsView";
 import type {
   AutostartEntry,
   CatalogSection,
+  LiveState,
   ProcessInfo,
   RuntimeSettings,
   Section,
@@ -40,6 +42,7 @@ export default function App() {
   const [loadingProcesses, setLoadingProcesses] = useState(false);
   const snapshotRepairTotal = useRef<number | null>(null);
   const snapshotRequest = useRef(0);
+  const snapshotStale = useRef(false);
 
   const loadSnapshot = useCallback(async (showLoading = false) => {
     const request = ++snapshotRequest.current;
@@ -94,26 +97,62 @@ export default function App() {
   }, [autostartsLoaded, loadAutostarts, section]);
 
   useEffect(() => {
-    const interval = window.setInterval(async () => {
-      try {
-        const live = await api.liveState();
-        if (
-          snapshotRepairTotal.current !== null &&
-          live.status.repairedTotal !== snapshotRepairTotal.current
-        ) {
-          await loadSnapshot();
-          return;
-        }
+    let disposed = false;
+    let unlistenLive: (() => void) | undefined;
+    let unlistenConfig: (() => void) | undefined;
+
+    async function refreshSnapshotWhenVisible() {
+      if (document.hidden) {
+        snapshotStale.current = true;
+        return;
+      }
+      snapshotStale.current = false;
+      await loadSnapshot();
+    }
+
+    void Promise.all([
+      listen<LiveState>("live-state-changed", ({ payload: live }) => {
         setSnapshot((current) =>
           current
             ? { ...current, status: live.status, activity: live.activity }
             : current,
         );
-      } catch {
-        return;
+        if (
+          snapshotRepairTotal.current !== null &&
+          live.status.repairedTotal !== snapshotRepairTotal.current
+        ) {
+          void refreshSnapshotWhenVisible();
+        }
+      }),
+      listen("config-changed", () => {
+        void refreshSnapshotWhenVisible();
+      }),
+    ])
+      .then(([live, config]) => {
+        if (disposed) {
+          live();
+          config();
+          return;
+        }
+        unlistenLive = live;
+        unlistenConfig = config;
+      })
+      .catch((caught) => {
+        if (!disposed) setError(errorMessage(caught));
+      });
+
+    function handleVisibilityChange() {
+      if (!document.hidden && snapshotStale.current) {
+        void refreshSnapshotWhenVisible();
       }
-    }, 4000);
-    return () => window.clearInterval(interval);
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      disposed = true;
+      unlistenLive?.();
+      unlistenConfig?.();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [loadSnapshot]);
 
   async function toggleCatalog(section: CatalogSection, id: string, enabled: boolean) {
@@ -234,6 +273,31 @@ export default function App() {
     try {
       await api.setProcessRuleEnabled(id, enabled);
       await loadSnapshot();
+      setError(null);
+    } catch (caught) {
+      setError(errorMessage(caught));
+      await loadSnapshot();
+    }
+  }
+
+  async function setProcessRuleNotificationsMuted(id: string, muted: boolean) {
+    snapshotRequest.current += 1;
+    setSnapshot((current) => {
+      if (!current) return current;
+      const mutedRuleIds = current.settings.mutedProcessNotifications.filter(
+        (ruleId) => ruleId !== id,
+      );
+      if (muted) mutedRuleIds.push(id);
+      return {
+        ...current,
+        settings: {
+          ...current.settings,
+          mutedProcessNotifications: mutedRuleIds,
+        },
+      };
+    });
+    try {
+      await api.setProcessRuleNotificationsMuted(id, muted);
       setError(null);
     } catch (caught) {
       setError(errorMessage(caught));
@@ -387,10 +451,12 @@ export default function App() {
       {section === "processes" && (
         <ProcessesView
           rules={snapshot.settings.processRules}
+          mutedRuleIds={snapshot.settings.mutedProcessNotifications}
           processes={processes}
           loadingProcesses={loadingProcesses}
           onLoadProcesses={loadProcesses}
           onToggle={setProcessRuleEnabled}
+          onNotificationsMuted={setProcessRuleNotificationsMuted}
           onAdd={addProcessRule}
           onRemove={removeProcessRule}
         />
