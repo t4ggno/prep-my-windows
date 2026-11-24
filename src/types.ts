@@ -15,7 +15,6 @@ export type CatalogSection =
   | "scheduledTasks";
 
 export interface EngineStatus {
-  running: boolean;
   busy: boolean;
   lastEnforcedAt: string | null;
   repairedTotal: number;
@@ -31,6 +30,11 @@ export interface SystemInfo {
   isElevated: boolean;
 }
 
+export interface PolicyChoice {
+  id: string;
+  label: string;
+}
+
 export interface PolicyItem {
   id: string;
   name: string;
@@ -40,6 +44,8 @@ export interface PolicyItem {
   compliant: boolean;
   current: string;
   wanted: string;
+  choices: PolicyChoice[];
+  choice: string | null;
   available: boolean;
   unavailableReason: string | null;
 }
@@ -69,12 +75,14 @@ export interface NetworkItem {
   blocked: boolean;
 }
 
+export type TaskStatus = "enabled" | "disabled" | "missing" | "unknown";
+
 export interface ScheduledTaskItem {
   id: string;
   name: string;
   path: string;
   enabled: boolean;
-  disabled: boolean;
+  status: TaskStatus;
 }
 
 export interface ProcessRule {
@@ -87,9 +95,15 @@ export interface ProcessRule {
 }
 
 export interface ProcessInfo {
-  pid: number;
   name: string;
   executablePath: string;
+  instances: number;
+}
+
+export interface NewProcessRule {
+  name: string;
+  executableName: string;
+  executablePath: string | null;
 }
 
 export type AutostartKind =
@@ -124,7 +138,9 @@ export interface ActivityEvent {
 }
 
 export interface AppSettings {
+  enforcementEnabled: boolean;
   policies: Record<string, boolean>;
+  policyChoices: Record<string, string>;
   packages: Record<string, boolean>;
   networkBlocks: Record<string, boolean>;
   scheduledTasks: Record<string, boolean>;
@@ -147,6 +163,7 @@ export interface Snapshot {
   networkBlocks: NetworkItem[];
   scheduledTasks: ScheduledTaskItem[];
   activity: ActivityEvent[];
+  issues: string[];
 }
 
 export interface LiveState {

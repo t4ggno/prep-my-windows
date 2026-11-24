@@ -1,25 +1,46 @@
 import { useState } from "react";
-import { SearchField, StateDot, ViewHeader } from "@/components/common";
-import { Switch } from "@/components/ui/switch";
+import {
+  BulkToggle,
+  EmptyState,
+  RuleSwitch,
+  SearchField,
+  StateDot,
+  ViewHeader,
+} from "@/components/common";
+import { matchesQuery } from "@/lib/utils";
 import type { NetworkItem } from "@/types";
 
 export function NetworkView({
   items,
+  pending,
   onToggle,
 }: {
   items: NetworkItem[];
-  onToggle: (id: string, enabled: boolean) => void;
+  pending: ReadonlySet<string>;
+  onToggle: (ids: string[], enabled: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
-  const filtered = items.filter((item) =>
-    item.domain.toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  const filtered = items.filter((item) => matchesQuery(query, item.domain));
 
   return (
     <div className="view-stack">
       <ViewHeader
         title="Network"
-        actions={<SearchField value={query} onChange={setQuery} />}
+        actions={
+          <>
+            <BulkToggle
+              items={filtered}
+              pending={pending.has("networkBlocks:bulk")}
+              onChange={(enabled) =>
+                onToggle(
+                  filtered.filter((item) => item.enabled !== enabled).map((item) => item.id),
+                  enabled,
+                )
+              }
+            />
+            <SearchField value={query} onChange={setQuery} />
+          </>
+        }
       />
       <section className="data-panel">
         <div className="data-header network-grid">
@@ -36,13 +57,15 @@ export function NetworkView({
             <span className={item.blocked ? "state-text active" : "state-text"}>
               {item.blocked ? "Blocked" : "Open"}
             </span>
-            <Switch
+            <RuleSwitch
               checked={item.enabled}
-              onCheckedChange={(enabled) => onToggle(item.id, enabled)}
-              aria-label={`Block ${item.domain}`}
+              pending={pending.has(`networkBlocks:${item.id}`)}
+              onCheckedChange={(enabled) => onToggle([item.id], enabled)}
+              label={`Block ${item.domain}`}
             />
           </div>
         ))}
+        {filtered.length === 0 && <EmptyState>No matching endpoints</EmptyState>}
       </section>
     </div>
   );

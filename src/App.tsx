@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { AlertCircle, LoaderCircle, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, LoaderCircle, X } from "lucide-react";
 import { api } from "@/api";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmDialog, type ConfirmRequest } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { useAppData } from "@/hooks/useAppData";
+import { useResource } from "@/hooks/useResource";
+import { errorMessage } from "@/lib/utils";
 import { ActivityView } from "@/views/ActivityView";
 import { AppsView } from "@/views/AppsView";
 import { AutostartView } from "@/views/AutostartView";
@@ -16,361 +19,220 @@ import { SettingsView } from "@/views/SettingsView";
 import type {
   AutostartEntry,
   CatalogSection,
-  LiveState,
-  ProcessInfo,
+  InstalledPackage,
+  NewProcessRule,
   RuntimeSettings,
   Section,
   Snapshot,
 } from "@/types";
 
-function errorMessage(error: unknown) {
-  if (typeof error === "string") return error;
-  if (error instanceof Error) return error.message;
-  return "The operation failed";
+const PROFILE_FILTERS = [{ name: "JSON", extensions: ["json"] }];
+
+function setCatalogEnabled(
+  snapshot: Snapshot,
+  section: CatalogSection,
+  ids: string[],
+  enabled: boolean,
+): Snapshot {
+  const selected = new Set(ids);
+  const toggle = <T extends { id: string; enabled: boolean }>(items: T[]) =>
+    items.map((item) => (selected.has(item.id) ? { ...item, enabled } : item));
+  switch (section) {
+    case "policies":
+      return { ...snapshot, policies: toggle(snapshot.policies) };
+    case "packages":
+      return { ...snapshot, packages: toggle(snapshot.packages) };
+    case "networkBlocks":
+      return { ...snapshot, networkBlocks: toggle(snapshot.networkBlocks) };
+    case "scheduledTasks":
+      return { ...snapshot, scheduledTasks: toggle(snapshot.scheduledTasks) };
+  }
+}
+
+function setPolicyChoice(snapshot: Snapshot, id: string, choice: string): Snapshot {
+  return {
+    ...snapshot,
+    policies: snapshot.policies.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            choice,
+            wanted: item.choices.find((option) => option.id === choice)?.label ?? item.wanted,
+          }
+        : item,
+    ),
+  };
+}
+
+function updateSettings(
+  snapshot: Snapshot,
+  update: (settings: Snapshot["settings"]) => Partial<Snapshot["settings"]>,
+): Snapshot {
+  return { ...snapshot, settings: { ...snapshot.settings, ...update(snapshot.settings) } };
 }
 
 export default function App() {
+  const { snapshot, setSnapshot, loading, error, setError, pending, loadSnapshot, mutate } =
+    useAppData();
   const [section, setSection] = useState<Section>("overview");
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [enforcing, setEnforcing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [autostarts, setAutostarts] = useState<AutostartEntry[]>([]);
-  const [loadingAutostarts, setLoadingAutostarts] = useState(false);
-  const [autostartsLoaded, setAutostartsLoaded] = useState(false);
-  const [processes, setProcesses] = useState<ProcessInfo[]>([]);
-  const [loadingProcesses, setLoadingProcesses] = useState(false);
-  const snapshotRepairTotal = useRef<number | null>(null);
-  const snapshotRequest = useRef(0);
-  const snapshotStale = useRef(false);
-
-  const loadSnapshot = useCallback(async (showLoading = false) => {
-    const request = ++snapshotRequest.current;
-    if (showLoading) setLoading(true);
-    try {
-      const next = await api.snapshot();
-      if (request !== snapshotRequest.current) return;
-      snapshotRepairTotal.current = next.status.repairedTotal;
-      setSnapshot(next);
-      setError(null);
-    } catch (caught) {
-      if (request !== snapshotRequest.current) return;
-      setError(errorMessage(caught));
-    } finally {
-      if (request === snapshotRequest.current) setLoading(false);
-    }
-  }, []);
-
-  const loadAutostarts = useCallback(async () => {
-    setLoadingAutostarts(true);
-    try {
-      setAutostarts(await api.listAutostarts());
-      setAutostartsLoaded(true);
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      setLoadingAutostarts(false);
-    }
-  }, []);
-
-  const loadProcesses = useCallback(async () => {
-    setLoadingProcesses(true);
-    try {
-      setProcesses(await api.listProcesses());
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      setLoadingProcesses(false);
-    }
-  }, []);
+  const [confirmation, setConfirmation] = useState<ConfirmRequest | null>(null);
+  const [dismissedIssues, setDismissedIssues] = useState("");
+  const reportError = useCallback((caught: unknown) => setError(errorMessage(caught)), [setError]);
+  const autostarts = useResource(api.listAutostarts, reportError);
+  const processes = useResource(api.listProcesses, reportError);
 
   useEffect(() => {
-    void loadSnapshot(true);
-  }, [loadSnapshot]);
-
-  useEffect(() => {
-    if (section === "autostart" && !autostartsLoaded) {
-      void loadAutostarts();
+    if (section === "autostart" && !autostarts.attempted && !autostarts.loading) {
+      void autostarts.reload();
     }
-  }, [autostartsLoaded, loadAutostarts, section]);
+  }, [autostarts, section]);
 
-  useEffect(() => {
-    let disposed = false;
-    let unlistenLive: (() => void) | undefined;
-    let unlistenConfig: (() => void) | undefined;
+  function toggleCatalog(catalog: CatalogSection, ids: string[], enabled: boolean) {
+    if (ids.length === 0) return;
+    void mutate(
+      ids.length === 1 ? `${catalog}:${ids[0]}` : `${catalog}:bulk`,
+      () => api.setCatalogItems(catalog, ids, enabled),
+      (current) => setCatalogEnabled(current, catalog, ids, enabled),
+    );
+  }
 
-    async function refreshSnapshotWhenVisible() {
-      if (document.hidden) {
-        snapshotStale.current = true;
-        return;
-      }
-      snapshotStale.current = false;
-      await loadSnapshot();
+  function choosePolicyOption(id: string, choice: string) {
+    void mutate(
+      `choice:${id}`,
+      () => api.setPolicyChoice(id, choice),
+      (current) => setPolicyChoice(current, id, choice),
+    );
+  }
+
+  function enforceNow() {
+    void mutate("enforce", api.enforceNow);
+  }
+
+  function setEnforcementEnabled(enabled: boolean) {
+    const apply = () =>
+      void mutate(
+        "enforcement",
+        () => api.setEnforcementEnabled(enabled),
+        (current) => updateSettings(current, () => ({ enforcementEnabled: enabled })),
+      );
+    if (!enabled) {
+      apply();
+      return;
     }
-
-    void Promise.all([
-      listen<LiveState>("live-state-changed", ({ payload: live }) => {
-        setSnapshot((current) =>
-          current
-            ? { ...current, status: live.status, activity: live.activity }
-            : current,
-        );
-        if (
-          snapshotRepairTotal.current !== null &&
-          live.status.repairedTotal !== snapshotRepairTotal.current
-        ) {
-          void refreshSnapshotWhenVisible();
-        }
-      }),
-      listen("config-changed", () => {
-        void refreshSnapshotWhenVisible();
-      }),
-    ])
-      .then(([live, config]) => {
-        if (disposed) {
-          live();
-          config();
-          return;
-        }
-        unlistenLive = live;
-        unlistenConfig = config;
-      })
-      .catch((caught) => {
-        if (!disposed) setError(errorMessage(caught));
-      });
-
-    function handleVisibilityChange() {
-      if (!document.hidden && snapshotStale.current) {
-        void refreshSnapshotWhenVisible();
-      }
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      disposed = true;
-      unlistenLive?.();
-      unlistenConfig?.();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [loadSnapshot]);
-
-  async function toggleCatalog(section: CatalogSection, id: string, enabled: boolean) {
-    snapshotRequest.current += 1;
-    setSnapshot((current) => {
-      if (!current) return current;
-      if (section === "policies") {
-        return {
-          ...current,
-          policies: current.policies.map((item) =>
-            item.id === id ? { ...item, enabled } : item,
-          ),
-        };
-      }
-      if (section === "packages") {
-        return {
-          ...current,
-          packages: current.packages.map((item) =>
-            item.id === id ? { ...item, enabled } : item,
-          ),
-        };
-      }
-      if (section === "networkBlocks") {
-        return {
-          ...current,
-          networkBlocks: current.networkBlocks.map((item) =>
-            item.id === id ? { ...item, enabled } : item,
-          ),
-        };
-      }
-      return {
-        ...current,
-        scheduledTasks: current.scheduledTasks.map((item) =>
-          item.id === id ? { ...item, enabled } : item,
-        ),
-      };
+    setConfirmation({
+      title: "Enable enforcement?",
+      description:
+        "Selected changes are applied now, including app removals.",
+      confirmLabel: "Enable",
+      onConfirm: apply,
     });
-    try {
-      await api.setCatalogItem(section, id, enabled);
-      await loadSnapshot();
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-      await loadSnapshot();
-    }
   }
 
-  async function enforceNow() {
-    setEnforcing(true);
-    try {
-      await api.enforceNow();
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      await loadSnapshot();
-      setEnforcing(false);
-    }
+  function removeInstalledApp(item: InstalledPackage) {
+    setConfirmation({
+      title: `Remove ${item.name}?`,
+      description: snapshot?.settings.enforcementEnabled
+        ? "The app is removed for all users and stays blocked."
+        : "The app is removed for all users once enforcement is enabled.",
+      confirmLabel: "Remove",
+      onConfirm: () => void mutate(`custom:${item.name}`, () => api.addCustomPackage(item.name)),
+    });
   }
 
-  async function addCustomPackage(name: string) {
-    setEnforcing(true);
-    try {
-      await api.addCustomPackage(name);
-      await api.enforceNow();
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      await loadSnapshot();
-      setEnforcing(false);
-    }
-  }
-
-  async function removeCustomPackage(name: string) {
-    try {
-      await api.removeCustomPackage(name);
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+  function removeCustomPackage(name: string) {
+    void mutate(
+      `custom:${name}`,
+      () => api.removeCustomPackage(name),
+      (current) =>
+        updateSettings(current, (settings) => ({
+          customPackages: settings.customPackages.filter((item) => item !== name),
+        })),
+    );
   }
 
   async function blockAutostart(entry: AutostartEntry) {
-    try {
-      await api.blockAutostart(entry);
-      setAutostarts((current) => current.filter((item) => item.id !== entry.id));
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+    const succeeded = await mutate(`autostart:${entry.id}`, () => api.blockAutostart(entry));
+    if (succeeded) void autostarts.reload();
   }
 
-  async function removeAutostartRule(id: string) {
-    try {
-      await api.removeAutostartRule(id);
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
-  }
-
-  async function setProcessRuleEnabled(id: string, enabled: boolean) {
-    snapshotRequest.current += 1;
-    setSnapshot((current) =>
-      current
-        ? {
-            ...current,
-            settings: {
-              ...current.settings,
-              processRules: current.settings.processRules.map((rule) =>
-                rule.id === id ? { ...rule, enabled } : rule,
-              ),
-            },
-          }
-        : current,
+  function removeAutostartRule(id: string) {
+    void mutate(
+      `autostart-rule:${id}`,
+      () => api.removeAutostartRule(id),
+      (current) =>
+        updateSettings(current, (settings) => ({
+          blockedAutostarts: settings.blockedAutostarts.filter((rule) => rule.id !== id),
+        })),
     );
-    try {
-      await api.setProcessRuleEnabled(id, enabled);
-      await loadSnapshot();
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-      await loadSnapshot();
-    }
   }
 
-  async function setProcessRuleNotificationsMuted(id: string, muted: boolean) {
-    snapshotRequest.current += 1;
-    setSnapshot((current) => {
-      if (!current) return current;
-      const mutedRuleIds = current.settings.mutedProcessNotifications.filter(
-        (ruleId) => ruleId !== id,
-      );
-      if (muted) mutedRuleIds.push(id);
-      return {
-        ...current,
-        settings: {
-          ...current.settings,
-          mutedProcessNotifications: mutedRuleIds,
-        },
-      };
-    });
-    try {
-      await api.setProcessRuleNotificationsMuted(id, muted);
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-      await loadSnapshot();
-    }
+  function setProcessRuleEnabled(id: string, enabled: boolean) {
+    void mutate(
+      `process:${id}`,
+      () => api.setProcessRuleEnabled(id, enabled),
+      (current) =>
+        updateSettings(current, (settings) => ({
+          processRules: settings.processRules.map((rule) =>
+            rule.id === id ? { ...rule, enabled } : rule,
+          ),
+        })),
+    );
   }
 
-  async function addProcessRule(process: {
-    name: string;
-    executableName: string;
-    executablePath: string | null;
-  }) {
-    try {
-      await api.addProcessRule(process);
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+  function setProcessRuleNotificationsMuted(id: string, muted: boolean) {
+    void mutate(
+      `notify:${id}`,
+      () => api.setProcessRuleNotificationsMuted(id, muted),
+      (current) =>
+        updateSettings(current, (settings) => ({
+          mutedProcessNotifications: muted
+            ? [...settings.mutedProcessNotifications.filter((ruleId) => ruleId !== id), id]
+            : settings.mutedProcessNotifications.filter((ruleId) => ruleId !== id),
+        })),
+    );
   }
 
-  async function removeProcessRule(id: string) {
-    try {
-      await api.removeProcessRule(id);
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+  function addProcessRule(rule: NewProcessRule) {
+    void mutate(`process-add:${rule.executableName}`, () => api.addProcessRule(rule));
   }
 
-  async function saveRuntimeSettings(settings: RuntimeSettings) {
-    try {
-      await api.updateRuntimeSettings(settings);
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+  function removeProcessRule(id: string) {
+    void mutate(
+      `process-remove:${id}`,
+      () => api.removeProcessRule(id),
+      (current) =>
+        updateSettings(current, (settings) => ({
+          processRules: settings.processRules.filter((rule) => rule.id !== id),
+        })),
+    );
+  }
+
+  function saveRuntimeSettings(settings: RuntimeSettings) {
+    return mutate("settings", () => api.updateRuntimeSettings(settings));
   }
 
   async function exportProfile() {
     const path = await save({
       defaultPath: "prep-my-windows-policy.json",
-      filters: [{ name: "JSON", extensions: ["json"] }],
+      filters: PROFILE_FILTERS,
     });
-    if (!path) return;
-    try {
-      await api.exportProfile(path);
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+    if (path) void mutate("profile", () => api.exportProfile(path));
   }
 
   async function importProfile() {
-    const path = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "JSON", extensions: ["json"] }],
-    });
-    if (typeof path !== "string") return;
-    try {
-      await api.importProfile(path);
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+    const path = await open({ multiple: false, directory: false, filters: PROFILE_FILTERS });
+    if (typeof path === "string") void mutate("profile", () => api.importProfile(path));
   }
 
-  async function resetProfile() {
-    try {
-      await api.resetProfile();
-      await loadSnapshot();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
+  function resetProfile() {
+    setConfirmation({
+      title: "Reset profile?",
+      description: snapshot?.settings.enforcementEnabled
+        ? "All rules return to the built-in profile and are enforced immediately. Windows settings already changed are not restored."
+        : "All rules return to the built-in profile. Windows settings already changed are not restored.",
+      confirmLabel: "Reset",
+      onConfirm: () => void mutate("profile", api.resetProfile),
+    });
   }
 
   async function clearActivity() {
@@ -378,14 +240,19 @@ export default function App() {
       await api.clearActivity();
       setSnapshot((current) => (current ? { ...current, activity: [] } : current));
     } catch (caught) {
-      setError(errorMessage(caught));
+      reportError(caught);
     }
   }
 
   if (loading && !snapshot) {
     return (
       <div className="startup-screen">
-        <div className="brand-mark large"><span /><span /><span /><span /></div>
+        <div className="brand-mark large">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
         <LoaderCircle className="size-5 animate-spin text-sky-400" />
       </div>
     );
@@ -401,31 +268,48 @@ export default function App() {
     );
   }
 
+  const issuesKey = snapshot.issues.join("\n");
+  const showIssues = snapshot.issues.length > 0 && issuesKey !== dismissedIssues;
+
   return (
     <AppShell
       section={section}
       setSection={setSection}
       system={snapshot.system}
       status={snapshot.status}
-      enforcing={enforcing}
+      enforcementEnabled={snapshot.settings.enforcementEnabled}
+      enforcing={pending.has("enforce")}
+      switchingEnforcement={pending.has("enforcement")}
       onEnforce={enforceNow}
+      onSetEnforcementEnabled={setEnforcementEnabled}
     >
       {error && (
-        <div className="error-banner">
-          <AlertCircle className="size-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">{error}</span>
-          <button onClick={() => setError(null)} aria-label="Dismiss error">
+        <div className="banner error" role="alert">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <span className="banner-text">{error}</span>
+          <button onClick={() => setError(null)} aria-label="Dismiss">
             <X className="size-4" />
           </button>
         </div>
       )}
-      {section === "overview" && <OverviewView snapshot={snapshot} />}
+      {showIssues && (
+        <div className="banner warning" role="status">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span className="banner-text">{issuesKey}</span>
+          <button onClick={() => setDismissedIssues(issuesKey)} aria-label="Dismiss">
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+      {section === "overview" && <OverviewView snapshot={snapshot} onNavigate={setSection} />}
       {section === "policy" && (
         <PolicyView
           policies={snapshot.policies}
           tasks={snapshot.scheduledTasks}
-          onTogglePolicy={(id, enabled) => toggleCatalog("policies", id, enabled)}
-          onToggleTask={(id, enabled) => toggleCatalog("scheduledTasks", id, enabled)}
+          pending={pending}
+          onTogglePolicies={(ids, enabled) => toggleCatalog("policies", ids, enabled)}
+          onToggleTasks={(ids, enabled) => toggleCatalog("scheduledTasks", ids, enabled)}
+          onChoosePolicyOption={choosePolicyOption}
         />
       )}
       {section === "apps" && (
@@ -433,17 +317,19 @@ export default function App() {
           rules={snapshot.packages}
           installed={snapshot.installedPackages}
           customPackages={snapshot.settings.customPackages}
-          onToggle={(id, enabled) => toggleCatalog("packages", id, enabled)}
-          onAddCustom={addCustomPackage}
+          pending={pending}
+          onToggle={(ids, enabled) => toggleCatalog("packages", ids, enabled)}
+          onAddCustom={removeInstalledApp}
           onRemoveCustom={removeCustomPackage}
         />
       )}
       {section === "autostart" && (
         <AutostartView
-          entries={autostarts}
+          entries={autostarts.items}
           blocked={snapshot.settings.blockedAutostarts}
-          loading={loadingAutostarts}
-          onRefresh={loadAutostarts}
+          loading={autostarts.loading}
+          pending={pending}
+          onRefresh={autostarts.reload}
           onBlock={blockAutostart}
           onRemoveRule={removeAutostartRule}
         />
@@ -452,9 +338,10 @@ export default function App() {
         <ProcessesView
           rules={snapshot.settings.processRules}
           mutedRuleIds={snapshot.settings.mutedProcessNotifications}
-          processes={processes}
-          loadingProcesses={loadingProcesses}
-          onLoadProcesses={loadProcesses}
+          processes={processes.items}
+          loadingProcesses={processes.loading}
+          pending={pending}
+          onLoadProcesses={processes.reload}
           onToggle={setProcessRuleEnabled}
           onNotificationsMuted={setProcessRuleNotificationsMuted}
           onAdd={addProcessRule}
@@ -464,7 +351,8 @@ export default function App() {
       {section === "network" && (
         <NetworkView
           items={snapshot.networkBlocks}
-          onToggle={(id, enabled) => toggleCatalog("networkBlocks", id, enabled)}
+          pending={pending}
+          onToggle={(ids, enabled) => toggleCatalog("networkBlocks", ids, enabled)}
         />
       )}
       {section === "activity" && (
@@ -474,12 +362,14 @@ export default function App() {
         <SettingsView
           settings={snapshot.settings}
           system={snapshot.system}
+          pending={pending}
           onSave={saveRuntimeSettings}
           onExport={exportProfile}
           onImport={importProfile}
           onReset={resetProfile}
         />
       )}
+      <ConfirmDialog request={confirmation} onClose={() => setConfirmation(null)} />
     </AppShell>
   );
 }

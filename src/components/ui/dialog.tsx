@@ -3,8 +3,6 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Dialog = DialogPrimitive.Root;
-export const DialogTrigger = DialogPrimitive.Trigger;
-export const DialogClose = DialogPrimitive.Close;
 
 export function DialogContent({
   className,
@@ -22,13 +20,23 @@ export function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-zinc-500 hover:bg-white/[0.06] hover:text-white">
+        <DialogPrimitive.Close
+          className="absolute right-4 top-4 rounded-md p-1 text-zinc-500 hover:bg-white/[0.06] hover:text-white"
+          aria-label="Close"
+        >
           <X className="size-4" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
 }
+export function DialogDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+  return <DialogPrimitive.Description className={cn("text-sm text-zinc-400", className)} {...props} />;
+}
+
 export function DialogTitle({
   className,
   ...props

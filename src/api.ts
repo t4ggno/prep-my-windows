@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AutostartEntry,
   CatalogSection,
+  NewProcessRule,
   ProcessInfo,
   RuntimeSettings,
   Snapshot,
@@ -9,17 +10,16 @@ import type {
 
 export const api = {
   snapshot: () => invoke<Snapshot>("get_snapshot"),
-  setCatalogItem: (section: CatalogSection, id: string, enabled: boolean) =>
-    invoke<void>("set_catalog_item", { section, id, enabled }),
+  setCatalogItems: (section: CatalogSection, ids: string[], enabled: boolean) =>
+    invoke<void>("set_catalog_items", { section, ids, enabled }),
+  setPolicyChoice: (id: string, choice: string) =>
+    invoke<void>("set_policy_choice", { id, choice }),
   setProcessRuleEnabled: (id: string, enabled: boolean) =>
     invoke<void>("set_process_rule_enabled", { id, enabled }),
   setProcessRuleNotificationsMuted: (id: string, muted: boolean) =>
     invoke<void>("set_process_rule_notifications_muted", { id, muted }),
-  addProcessRule: (request: {
-    name: string;
-    executableName: string;
-    executablePath: string | null;
-  }) => invoke<void>("add_process_rule", { request }),
+  addProcessRule: (request: NewProcessRule) =>
+    invoke<void>("add_process_rule", { request }),
   removeProcessRule: (id: string) => invoke<void>("remove_process_rule", { id }),
   listProcesses: () => invoke<ProcessInfo[]>("list_processes"),
   listAutostarts: () => invoke<AutostartEntry[]>("list_autostarts"),
@@ -33,6 +33,8 @@ export const api = {
     invoke<void>("remove_custom_package", { packageName }),
   updateRuntimeSettings: (settings: RuntimeSettings) =>
     invoke<void>("update_runtime_settings", { settings }),
+  setEnforcementEnabled: (enabled: boolean) =>
+    invoke<void>("set_enforcement_enabled", { enabled }),
   enforceNow: () => invoke<number>("enforce_now"),
   resetProfile: () => invoke<void>("reset_profile"),
   exportProfile: (path: string) => invoke<void>("export_profile", { path }),

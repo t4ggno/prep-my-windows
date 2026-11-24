@@ -5,11 +5,16 @@ import {
   Boxes,
   Gauge,
   ListRestart,
+  LoaderCircle,
+  Power,
+  PowerOff,
   Settings2,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn, formatTimestamp } from "@/lib/utils";
+import { useNow } from "@/hooks/useNow";
+import { engineState, engineStateLabels } from "@/lib/engineState";
+import { cn, formatRelative, formatTimestamp } from "@/lib/utils";
 import type { EngineStatus, Section, SystemInfo } from "@/types";
 
 const navigation: Array<{
@@ -32,18 +37,28 @@ export function AppShell({
   setSection,
   system,
   status,
+  enforcementEnabled,
   enforcing,
+  switchingEnforcement,
   onEnforce,
+  onSetEnforcementEnabled,
   children,
 }: {
   section: Section;
   setSection: (section: Section) => void;
   system: SystemInfo;
   status: EngineStatus;
+  enforcementEnabled: boolean;
   enforcing: boolean;
+  switchingEnforcement: boolean;
   onEnforce: () => void;
+  onSetEnforcementEnabled: (enabled: boolean) => void;
   children: React.ReactNode;
 }) {
+  const now = useNow();
+  const state = engineState(status, enforcementEnabled);
+  const running = enforcing || status.busy;
+
   return (
     <div className="app-frame">
       <aside className="sidebar">
@@ -64,6 +79,7 @@ export function AppShell({
               <button
                 key={item.id}
                 className={cn("nav-item", section === item.id && "active")}
+                aria-current={section === item.id ? "page" : undefined}
                 onClick={() => setSection(item.id)}
               >
                 <Icon className="size-[17px]" />
@@ -73,30 +89,56 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="sidebar-system">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
-            <span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.5)]" />
-            Policy active
-          </div>
-          <div className="mt-2 text-xs text-zinc-600">
+        <button className="sidebar-system" onClick={() => setSection("activity")}>
+          <span className="flex items-center gap-2 text-sm text-zinc-300">
+            <span className={cn("engine-dot", state)} />
+            {engineStateLabels[state]}
+          </span>
+          <span className="mt-2 block text-xs text-zinc-600">
             Windows 11 {system.displayVersion} · {system.buildNumber}
-          </div>
-        </div>
+          </span>
+        </button>
       </aside>
 
       <main className="main-panel">
         <div className="topbar">
-          <div className="text-xs text-zinc-500">
-            Last enforced {formatTimestamp(status.lastEnforcedAt)}
+          <div className="text-xs text-zinc-500" title={formatTimestamp(status.lastEnforcedAt)}>
+            Last enforced {formatRelative(status.lastEnforcedAt, now)}
           </div>
-          <Button
-            size="sm"
-            onClick={onEnforce}
-            disabled={enforcing || status.busy}
-          >
-            <ShieldCheck className={cn("size-4", enforcing && "animate-pulse")} />
-            Enforce now
-          </Button>
+          {enforcementEnabled ? (
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => onSetEnforcementEnabled(false)}
+                disabled={switchingEnforcement}
+              >
+                <PowerOff className="size-4" />
+                Disable
+              </Button>
+              <Button size="sm" onClick={onEnforce} disabled={running}>
+                {running ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="size-4" />
+                )}
+                {running ? "Enforcing" : "Enforce now"}
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => onSetEnforcementEnabled(true)}
+              disabled={switchingEnforcement || running}
+            >
+              {switchingEnforcement ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Power className="size-4" />
+              )}
+              Enable
+            </Button>
+          )}
         </div>
         <div className="content-scroll">{children}</div>
       </main>

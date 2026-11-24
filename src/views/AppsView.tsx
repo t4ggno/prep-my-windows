@@ -1,15 +1,30 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { SearchField, StateDot, ViewHeader } from "@/components/common";
+import { LoaderCircle, Trash2 } from "lucide-react";
+import {
+  BulkToggle,
+  EmptyState,
+  RuleSwitch,
+  SearchField,
+  SegmentedControl,
+  StateDot,
+  ViewHeader,
+} from "@/components/common";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+import { matchesQuery } from "@/lib/utils";
 import type { InstalledPackage, PackageItem } from "@/types";
+
+type AppsTab = "rules" | "installed";
+
+function packageState(item: PackageItem) {
+  if (!item.installed) return "Not installed";
+  return item.provisioned ? "Provisioned" : "Installed";
+}
 
 export function AppsView({
   rules,
   installed,
   customPackages,
+  pending,
   onToggle,
   onAddCustom,
   onRemoveCustom,
@@ -17,11 +32,12 @@ export function AppsView({
   rules: PackageItem[];
   installed: InstalledPackage[];
   customPackages: string[];
-  onToggle: (id: string, enabled: boolean) => void;
-  onAddCustom: (name: string) => void;
+  pending: ReadonlySet<string>;
+  onToggle: (ids: string[], enabled: boolean) => void;
+  onAddCustom: (item: InstalledPackage) => void;
   onRemoveCustom: (name: string) => void;
 }) {
-  const [tab, setTab] = useState<"rules" | "installed">("rules");
+  const [tab, setTab] = useState<AppsTab>("rules");
   const [query, setQuery] = useState("");
   const managedNames = useMemo(
     () =>
@@ -31,33 +47,36 @@ export function AppsView({
       ]),
     [customPackages, rules],
   );
-  const normalized = query.trim().toLowerCase();
-  const filteredRules = rules.filter(
-    (item) =>
-      !normalized ||
-      item.name.toLowerCase().includes(normalized) ||
-      item.packageName.toLowerCase().includes(normalized),
-  );
-  const filteredInstalled = installed.filter(
-    (item) =>
-      !normalized ||
-      item.name.toLowerCase().includes(normalized) ||
-      item.publisher.toLowerCase().includes(normalized),
+  const filteredRules = rules.filter((item) => matchesQuery(query, item.name, item.packageName));
+  const filteredCustom = customPackages.filter((name) => matchesQuery(query, name));
+  const filteredInstalled = installed.filter((item) =>
+    matchesQuery(query, item.name, item.publisher, item.fullName),
   );
 
   return (
     <div className="view-stack">
-      <ViewHeader
-        title="Apps"
-        actions={<SearchField value={query} onChange={setQuery} />}
-      />
-      <div className="segmented-control">
-        <button className={cn(tab === "rules" && "active")} onClick={() => setTab("rules")}>
-          Removal rules
-        </button>
-        <button className={cn(tab === "installed" && "active")} onClick={() => setTab("installed")}>
-          Installed
-        </button>
+      <ViewHeader title="Apps" actions={<SearchField value={query} onChange={setQuery} />} />
+      <div className="flex items-center justify-between gap-3">
+        <SegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { id: "rules", label: "Removal rules", count: rules.length + customPackages.length },
+            { id: "installed", label: "Installed", count: installed.length },
+          ]}
+        />
+        {tab === "rules" && (
+          <BulkToggle
+            items={filteredRules}
+            pending={pending.has("packages:bulk")}
+            onChange={(enabled) =>
+              onToggle(
+                filteredRules.filter((item) => item.enabled !== enabled).map((item) => item.id),
+                enabled,
+              )
+            }
+          />
+        )}
       </div>
 
       {tab === "rules" ? (
@@ -77,26 +96,29 @@ export function AppsView({
                 </div>
                 <code className="truncate">{item.packageName}</code>
                 <span className={!item.installed ? "state-text active" : "state-text"}>
-                  {item.installed ? (item.provisioned ? "Provisioned" : "Installed") : "Absent"}
+                  {packageState(item)}
                 </span>
-                <Switch
+                <RuleSwitch
                   checked={item.enabled}
-                  onCheckedChange={(enabled) => onToggle(item.id, enabled)}
-                  aria-label={`Remove ${item.name}`}
+                  pending={pending.has(`packages:${item.id}`)}
+                  onCheckedChange={(enabled) => onToggle([item.id], enabled)}
+                  label={`Remove ${item.name}`}
                 />
               </div>
             ))}
+            {filteredRules.length === 0 && <EmptyState>No matching apps</EmptyState>}
           </section>
 
-          {customPackages.length > 0 && (
+          {filteredCustom.length > 0 && (
             <section className="data-panel">
               <div className="section-label">Custom rules</div>
-              {customPackages.map((name) => (
+              {filteredCustom.map((name) => (
                 <div className="data-row custom-package-grid" key={name}>
                   <code className="truncate">{name}</code>
                   <Button
                     variant="ghost"
                     size="icon"
+                    disabled={pending.has(`custom:${name}`)}
                     onClick={() => onRemoveCustom(name)}
                     aria-label={`Remove ${name} rule`}
                   >
@@ -117,25 +139,41 @@ export function AppsView({
           </div>
           {filteredInstalled.map((item) => {
             const managed = managedNames.has(item.name.toLowerCase());
+            const removing = pending.has(`custom:${item.name}`);
             return (
               <div className="data-row installed-grid" key={item.fullName}>
                 <div className="min-w-0">
                   <div className="row-primary truncate">{item.name}</div>
-                  <div className="row-secondary truncate">{item.fullName}</div>
+                  <div className="row-secondary truncate" title={item.fullName}>
+                    {item.provisioned ? `Provisioned · ${item.fullName}` : item.fullName}
+                  </div>
                 </div>
-                <span className="row-secondary truncate">{item.publisher}</span>
-                <code>{item.version}</code>
+                <span className="row-secondary truncate" title={item.publisher}>
+                  {item.publisher}
+                </span>
+                <code className="truncate">{item.version}</code>
                 <Button
                   variant="secondary"
                   size="sm"
-                  disabled={managed || !item.removable}
-                  onClick={() => onAddCustom(item.name)}
+                  disabled={managed || removing || !item.removable}
+                  onClick={() => onAddCustom(item)}
                 >
-                  {managed ? "Managed" : <><Plus className="size-3.5" /> Block</>}
+                  {removing ? (
+                    <LoaderCircle className="size-3.5 animate-spin" />
+                  ) : managed ? (
+                    "Managed"
+                  ) : item.removable ? (
+                    <>
+                      <Trash2 className="size-3.5" /> Remove
+                    </>
+                  ) : (
+                    "System app"
+                  )}
                 </Button>
               </div>
             );
           })}
+          {filteredInstalled.length === 0 && <EmptyState>No matching apps</EmptyState>}
         </section>
       )}
     </div>
