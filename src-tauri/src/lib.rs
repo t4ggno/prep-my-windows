@@ -4,6 +4,7 @@ mod engine;
 mod events;
 mod models;
 mod process_enforcement;
+mod snapshot;
 mod state;
 mod windows;
 
@@ -12,6 +13,8 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{Manager, WindowEvent};
 
 use state::AppState;
+
+const BACKGROUND_ARGUMENT: &str = "--background";
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -42,9 +45,7 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             "enforce" => {
                 let app = app.clone();
                 let state = app.state::<AppState>().inner().clone();
-                tauri::async_runtime::spawn_blocking(move || {
-                    let _ = engine::enforce_all(&app, &state);
-                });
+                tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&app, &state));
             }
             "quit" => app.exit(0),
             _ => {}
@@ -63,51 +64,63 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn initialize(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let system = windows::system_info().map_err(std::io::Error::other)?;
+    if !system.is_windows_11 {
+        return Err(std::io::Error::other("Windows 11 is required").into());
+    }
+    if !system.is_elevated {
+        return Err(std::io::Error::other("Administrator access is required").into());
+    }
+
+    let config_directory = app.path().app_config_dir().map_err(std::io::Error::other)?;
+    let state = AppState::load(&config_directory).map_err(std::io::Error::other)?;
+    app.manage(system);
+    app.manage(state.clone());
+    build_tray(app)?;
+
+    if let Some(window) = app.get_webview_window("main") {
+        let window_to_hide = window.clone();
+        window.on_window_event(move |event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window_to_hide.hide();
+            }
+        });
+    }
+
+    if !std::env::args().any(|argument| argument == BACKGROUND_ARGUMENT) {
+        show_main_window(app.handle());
+    }
+    engine::start(app.handle().clone(), state).map_err(std::io::Error::other)?;
+    Ok(())
+}
+
+fn report_startup_error(error: &dyn std::fmt::Display) {
+    windows::show_error_dialog(
+        "Prep My Windows",
+        &format!(
+            "Prep My Windows could not start.
+
+{error}"
+        ),
+    );
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() -> tauri::Result<()> {
-    tauri::Builder::default()
+pub fn run() {
+    let result = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
-            if !args.iter().any(|argument| argument == "--background") {
+            if !args.iter().any(|argument| argument == BACKGROUND_ARGUMENT) {
                 show_main_window(app);
             }
         }))
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
-            let info = windows::system_info().map_err(std::io::Error::other)?;
-            if !info.is_windows_11 {
-                return Err(std::io::Error::other("Windows 11 is required").into());
-            }
-            if !info.is_elevated {
-                return Err(std::io::Error::other("Administrator access is required").into());
-            }
-
-            let config_directory = app.path().app_config_dir().map_err(std::io::Error::other)?;
-            let state = AppState::load(&config_directory).map_err(std::io::Error::other)?;
-            windows::startup_task::configure(state.config().start_with_windows)
-                .map_err(std::io::Error::other)?;
-            app.manage(state.clone());
-            build_tray(app)?;
-
-            if let Some(window) = app.get_webview_window("main") {
-                let window_to_hide = window.clone();
-                window.on_window_event(move |event| {
-                    if let WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
-                        let _ = window_to_hide.hide();
-                    }
-                });
-            }
-
-            let background = std::env::args().any(|argument| argument == "--background");
-            if !background {
-                show_main_window(app.handle());
-            }
-            engine::start(app.handle().clone(), state);
-            Ok(())
-        })
+        .setup(|app| initialize(app).inspect_err(|error| report_startup_error(error)))
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
-            commands::set_catalog_item,
+            commands::set_catalog_items,
+            commands::set_policy_choice,
             commands::set_process_rule_enabled,
             commands::set_process_rule_notifications_muted,
             commands::add_process_rule,
@@ -119,11 +132,16 @@ pub fn run() -> tauri::Result<()> {
             commands::add_custom_package,
             commands::remove_custom_package,
             commands::update_runtime_settings,
+            commands::set_enforcement_enabled,
             commands::enforce_now,
             commands::reset_profile,
             commands::export_profile,
             commands::import_profile,
             commands::clear_activity,
         ])
-        .run(tauri::generate_context!())
+        .run(tauri::generate_context!());
+    if let Err(error) = result {
+        report_startup_error(&error);
+        std::process::exit(1);
+    }
 }

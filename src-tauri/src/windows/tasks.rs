@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::models::ScheduledTaskDefinition;
+use crate::models::{ScheduledTaskDefinition, TaskStatus};
 
-use super::{run_hidden, run_powershell_json};
+use super::{DEFAULT_TIMEOUT, run_hidden, run_powershell_json};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -13,7 +13,9 @@ struct TaskState {
     state: String,
 }
 
-pub fn states(definitions: &[ScheduledTaskDefinition]) -> Result<HashMap<String, bool>, String> {
+pub fn states(
+    definitions: &[ScheduledTaskDefinition],
+) -> Result<HashMap<String, TaskStatus>, String> {
     let script = r#"
 $ErrorActionPreference = 'Stop'
 $items = @((Get-ScheduledTask | ForEach-Object {
@@ -24,10 +26,17 @@ $items = @((Get-ScheduledTask | ForEach-Object {
 }))
 ConvertTo-Json -InputObject @($items) -Compress
 "#;
-    let states: Vec<TaskState> = run_powershell_json(script)?;
+    let states: Vec<TaskState> = run_powershell_json(script, DEFAULT_TIMEOUT)?;
     let by_path = states
         .into_iter()
-        .map(|state| (state.path.to_ascii_lowercase(), state.state == "Disabled"))
+        .map(|state| {
+            let status = if state.state == "Disabled" {
+                TaskStatus::Disabled
+            } else {
+                TaskStatus::Enabled
+            };
+            (state.path.to_ascii_lowercase(), status)
+        })
         .collect::<HashMap<_, _>>();
     Ok(definitions
         .iter()
@@ -37,14 +46,18 @@ ConvertTo-Json -InputObject @($items) -Compress
                 by_path
                     .get(&definition.path.to_ascii_lowercase())
                     .copied()
-                    .unwrap_or(true),
+                    .unwrap_or(TaskStatus::Missing),
             )
         })
         .collect())
 }
 
 pub fn disable(path: &str) -> Result<bool, String> {
-    let output = run_hidden("schtasks.exe", &["/Change", "/TN", path, "/Disable"])?;
+    let output = run_hidden(
+        "schtasks.exe",
+        &["/Change", "/TN", path, "/Disable"],
+        DEFAULT_TIMEOUT,
+    )?;
     if output.status.success() {
         return Ok(true);
     }

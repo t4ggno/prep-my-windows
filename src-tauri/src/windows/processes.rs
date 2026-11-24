@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -32,27 +33,41 @@ struct ProcessStartTrace {
     process_name: String,
 }
 
-pub fn list() -> Vec<ProcessInfo> {
-    let system = System::new_all();
-    let mut processes = system
-        .processes()
-        .iter()
-        .map(|(pid, process)| ProcessInfo {
-            pid: pid.as_u32(),
-            name: process.name().to_string_lossy().into_owned(),
-            executable_path: process
-                .exe()
-                .map(|path| path.to_string_lossy().into_owned())
-                .unwrap_or_default(),
-        })
-        .collect::<Vec<_>>();
-    processes.sort_by(|left, right| {
-        left.name
-            .to_ascii_lowercase()
-            .cmp(&right.name.to_ascii_lowercase())
-            .then(left.pid.cmp(&right.pid))
-    });
-    processes
+fn new_system() -> Result<System, String> {
+    System::new().map_err(|error| format!("Could not read running processes: {error}"))
+}
+
+fn executable_refresh() -> ProcessRefreshKind {
+    ProcessRefreshKind::nothing().with_exe(UpdateKind::OnlyIfNotSet)
+}
+
+fn launch_refresh() -> ProcessRefreshKind {
+    ProcessRefreshKind::nothing()
+        .with_exe(UpdateKind::Always)
+        .with_cmd(UpdateKind::Always)
+        .with_cwd(UpdateKind::Always)
+}
+
+pub fn list() -> Result<Vec<ProcessInfo>, String> {
+    let mut system = new_system()?;
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, executable_refresh());
+    let mut grouped = BTreeMap::<(String, String), ProcessInfo>::new();
+    for process in system.processes().values() {
+        let name = process.name().to_string_lossy().into_owned();
+        let executable_path = process
+            .exe()
+            .map(|path| path.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        grouped
+            .entry((name.to_lowercase(), executable_path.to_lowercase()))
+            .and_modify(|existing| existing.instances += 1)
+            .or_insert(ProcessInfo {
+                name,
+                executable_path,
+                instances: 1,
+            });
+    }
+    Ok(grouped.into_values().collect())
 }
 
 fn matches(process_name: &str, process_path: Option<&Path>, rule: &ProcessRule) -> bool {
@@ -91,9 +106,9 @@ fn stop_process(
     process: &Process,
     rules: &[ProcessRule],
     is_allowed_once: &mut impl FnMut(&str) -> bool,
-) -> Option<StoppedProcess> {
+) -> Result<Option<StoppedProcess>, String> {
     if pid.as_u32() == std::process::id() {
-        return None;
+        return Ok(None);
     }
 
     let process_name = process.name().to_string_lossy().into_owned();
@@ -101,13 +116,13 @@ fn stop_process(
         .iter()
         .filter(|rule| matches(&process_name, process.exe(), rule))
         .collect::<Vec<_>>();
-    if matching_rules.is_empty() {
-        return None;
-    }
+    let Some(primary_rule) = matching_rules.first() else {
+        return Ok(None);
+    };
 
-    let process_key = allowance_key(matching_rules[0]);
+    let process_key = allowance_key(primary_rule);
     if is_allowed_once(&process_key) {
-        return None;
+        return Ok(None);
     }
 
     let launch = process.exe().map(|executable_path| ProcessLaunch {
@@ -116,32 +131,70 @@ fn stop_process(
         working_directory: process.cwd().map(Path::to_owned),
     });
     if !process.kill() {
-        return None;
+        return Err(format!("Could not stop {process_name} (process {pid})"));
     }
 
-    Some(StoppedProcess {
+    Ok(Some(StoppedProcess {
         process_name,
-        rule_name: matching_rules[0].name.clone(),
+        rule_name: primary_rule.name.clone(),
         rule_ids: matching_rules.iter().map(|rule| rule.id.clone()).collect(),
         allowance_key: process_key,
         launch,
-    })
+    }))
+}
+
+#[derive(Default)]
+pub struct ProcessEnforcement {
+    pub stopped: Vec<StoppedProcess>,
+    pub errors: Vec<String>,
 }
 
 pub fn enforce(
     rules: &[ProcessRule],
     mut is_allowed_once: impl FnMut(&str) -> bool,
-) -> Vec<StoppedProcess> {
+) -> ProcessEnforcement {
+    let mut outcome = ProcessEnforcement::default();
     if rules.is_empty() {
-        return Vec::new();
+        return outcome;
     }
 
-    let system = System::new_all();
-    system
+    let mut system = match new_system() {
+        Ok(system) => system,
+        Err(error) => {
+            outcome.errors.push(error);
+            return outcome;
+        }
+    };
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, executable_refresh());
+    let candidates = system
         .processes()
         .iter()
-        .filter_map(|(pid, process)| stop_process(*pid, process, rules, &mut is_allowed_once))
-        .collect()
+        .filter(|(_, process)| {
+            let name = process.name().to_string_lossy();
+            rules.iter().any(|rule| matches(&name, process.exe(), rule))
+        })
+        .map(|(pid, _)| *pid)
+        .collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return outcome;
+    }
+
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&candidates),
+        true,
+        launch_refresh(),
+    );
+    for pid in candidates {
+        let Some(process) = system.process(pid) else {
+            continue;
+        };
+        match stop_process(pid, process, rules, &mut is_allowed_once) {
+            Ok(Some(stopped)) => outcome.stopped.push(stopped),
+            Ok(None) => {}
+            Err(error) => outcome.errors.push(error),
+        }
+    }
+    outcome
 }
 
 pub fn enforce_started(
@@ -149,29 +202,22 @@ pub fn enforce_started(
     process_name: &str,
     rules: &[ProcessRule],
     mut is_allowed_once: impl FnMut(&str) -> bool,
-) -> Option<StoppedProcess> {
+) -> Result<Option<StoppedProcess>, String> {
     let matching_names = rules
         .iter()
         .filter(|rule| rule.enabled && process_name.eq_ignore_ascii_case(&rule.executable_name))
         .collect::<Vec<_>>();
     if matching_names.is_empty() {
-        return None;
+        return Ok(None);
     }
     let requires_path = matching_names
         .iter()
         .all(|rule| rule.executable_path.is_some());
 
     let pid = Pid::from_u32(process_id);
-    let mut system = System::new();
+    let mut system = new_system()?;
     for attempt in 0..4 {
-        system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[pid]),
-            true,
-            ProcessRefreshKind::nothing()
-                .with_exe(UpdateKind::Always)
-                .with_cmd(UpdateKind::Always)
-                .with_cwd(UpdateKind::Always),
-        );
+        system.refresh_processes_specifics(ProcessesToUpdate::Some(&[pid]), true, launch_refresh());
         if let Some(process) = system.process(pid)
             && (!requires_path || process.exe().is_some())
         {
@@ -181,7 +227,7 @@ pub fn enforce_started(
             std::thread::sleep(std::time::Duration::from_millis(25));
         }
     }
-    None
+    Ok(None)
 }
 
 pub fn launch(process: &ProcessLaunch) -> Result<(), String> {
@@ -309,11 +355,13 @@ mod tests {
             built_in: false,
         };
 
-        assert!(enforce(std::slice::from_ref(&process_rule), |_| true).is_empty());
+        let allowed = enforce(std::slice::from_ref(&process_rule), |_| true);
+        assert!(allowed.stopped.is_empty() && allowed.errors.is_empty());
         assert!(child.try_wait().unwrap().is_none());
 
         let stopped = enforce(std::slice::from_ref(&process_rule), |_| false);
-        assert_eq!(stopped.len(), 1);
+        assert_eq!(stopped.stopped.len(), 1);
+        assert!(stopped.errors.is_empty());
         child.wait().unwrap();
     }
 }

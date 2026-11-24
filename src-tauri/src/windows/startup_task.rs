@@ -1,4 +1,4 @@
-use super::run_powershell;
+use super::{DEFAULT_TIMEOUT, run_powershell};
 
 const TASK_NAME: &str = "Prep My Windows";
 
@@ -12,8 +12,9 @@ fn change_from_output(output: &str) -> Result<bool, String> {
 
 pub fn configure(enabled: bool) -> Result<bool, String> {
     if !enabled {
-        let output = run_powershell(&format!(
-            r#"
+        let output = run_powershell(
+            &format!(
+                r#"
 $ErrorActionPreference = 'Stop'
 $task = Get-ScheduledTask -TaskPath '\' | Where-Object {{ $_.TaskName -ceq '{TASK_NAME}' }} | Select-Object -First 1
 if ($null -eq $task) {{
@@ -23,7 +24,9 @@ if ($null -eq $task) {{
     'changed'
 }}
 "#
-        ))?;
+            ),
+            DEFAULT_TIMEOUT,
+        )?;
         return change_from_output(&output);
     }
 
@@ -34,8 +37,9 @@ if ($null -eq $task) {{
         .ok_or_else(|| "Could not resolve application directory".to_owned())?;
     let executable = executable.display().to_string().replace('\'', "''");
     let working_directory = working_directory.display().to_string().replace('\'', "''");
-    let output = run_powershell(&format!(
-        r#"
+    let output = run_powershell(
+        &format!(
+            r#"
 $ErrorActionPreference = 'Stop'
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $task = Get-ScheduledTask -TaskPath '\' | Where-Object {{ $_.TaskName -ceq '{TASK_NAME}' }} | Select-Object -First 1
@@ -74,7 +78,9 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 Register-ScheduledTask -TaskName '{TASK_NAME}' -TaskPath '\' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 'changed'
 "#
-    ))?;
+        ),
+        DEFAULT_TIMEOUT,
+    )?;
     change_from_output(&output)
 }
 

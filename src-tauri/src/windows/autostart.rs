@@ -11,7 +11,7 @@ use winreg::types::FromRegValue;
 
 use crate::models::{AutostartEntry, AutostartKind, AutostartRule};
 
-use super::{run_hidden, run_powershell, run_powershell_json};
+use super::{DEFAULT_TIMEOUT, run_powershell, run_powershell_json, services};
 
 #[derive(Clone, Copy)]
 enum RootHive {
@@ -212,7 +212,7 @@ foreach ($task in @(Get-ScheduledTask)) {
 }
 ConvertTo-Json -InputObject @($items) -Compress
 "#;
-    let entries: Vec<PowerShellAutostart> = run_powershell_json(script)?;
+    let entries: Vec<PowerShellAutostart> = run_powershell_json(script, DEFAULT_TIMEOUT)?;
     Ok(entries
         .into_iter()
         .map(|entry| AutostartEntry {
@@ -241,7 +241,7 @@ $items = @((Get-CimInstance Win32_Service | Where-Object { $_.StartMode -eq 'Aut
 }))
 ConvertTo-Json -InputObject @($items) -Compress
 "#;
-    let entries: Vec<PowerShellAutostart> = run_powershell_json(script)?;
+    let entries: Vec<PowerShellAutostart> = run_powershell_json(script, DEFAULT_TIMEOUT)?;
     Ok(entries
         .into_iter()
         .map(|entry| AutostartEntry {
@@ -327,7 +327,7 @@ fn disable_task(rule: &AutostartRule) -> Result<bool, String> {
     let script = format!(
         "$ErrorActionPreference = 'Stop'; $task = Get-ScheduledTask -ErrorAction Stop | Where-Object {{ \"$($_.TaskPath)$($_.TaskName)\" -eq '{task_path}' }} | Select-Object -First 1; if ($null -eq $task) {{ 'missing' }} elseif ($task.State -eq 'Disabled') {{ 'disabled' }} else {{ Disable-ScheduledTask -InputObject $task -ErrorAction Stop | Out-Null; 'changed' }}"
     );
-    match run_powershell(&script)?.as_str() {
+    match run_powershell(&script, DEFAULT_TIMEOUT)?.as_str() {
         "changed" => Ok(true),
         "disabled" | "missing" => Ok(false),
         value => Err(format!("Unexpected scheduled task state: {value}")),
@@ -348,7 +348,7 @@ fn disable_service(rule: &AutostartRule) -> Result<bool, String> {
     }
     key.set_value("Start", &4_u32)
         .map_err(|error| format!("Could not disable service {}: {error}", rule.name))?;
-    let _ = run_hidden("sc.exe", &["stop", &rule.location]);
+    services::stop(&rule.location)?;
     Ok(true)
 }
 

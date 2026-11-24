@@ -242,7 +242,7 @@ fn read_hibernation() -> Result<SystemSettingState, String> {
 }
 
 fn run_powercfg(arguments: &[&str]) -> Result<(), String> {
-    let output = super::run_hidden("powercfg.exe", arguments)?;
+    let output = super::run_hidden("powercfg.exe", arguments, super::DEFAULT_TIMEOUT)?;
     if output.status.success() {
         return Ok(());
     }
@@ -310,6 +310,7 @@ fn widgets_taskbar_policy() -> PolicyDefinition {
         path: r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
         value_name: "TaskbarDa",
         desired: RegistryValue::Dword(0),
+        choices: &[],
         support: SupportRequirement::windows_build(22_000),
     }
 }

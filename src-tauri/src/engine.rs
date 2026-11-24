@@ -1,36 +1,22 @@
 use std::time::Duration;
 
+use parking_lot::MutexGuard;
 use tauri::AppHandle;
 
 use crate::catalog;
 use crate::events::publish_live_state;
-use crate::models::{SupportRequirement, SystemSupport};
+use crate::models::{
+    PolicyDefinition, RegistryValue, SupportRequirement, SystemSupport, TaskStatus,
+};
 use crate::process_enforcement;
 use crate::state::AppState;
 use crate::windows::{
-    self, autostart, hosts, packages, registry, startup_task, system_settings, tasks,
+    self, autostart, hosts, packages, registry, services, startup_task, system_settings, tasks,
 };
 
 const RUNTIME_RECONCILIATION_INTERVAL: Duration = Duration::from_secs(60 * 60);
 const SLOW_RECONCILIATION_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
-
-struct BusyGuard(AppState);
-
-impl BusyGuard {
-    fn acquire(state: &AppState) -> Result<Self, String> {
-        if state.begin_enforcement() {
-            Ok(Self(state.clone()))
-        } else {
-            Err("Enforcement is already running".to_owned())
-        }
-    }
-}
-
-impl Drop for BusyGuard {
-    fn drop(&mut self) {
-        self.0.finish_enforcement();
-    }
-}
+const MONITOR_READY_TIMEOUT: Duration = Duration::from_secs(10);
 
 fn report_errors(state: &AppState, errors: &[String]) {
     for error in errors {
@@ -70,6 +56,26 @@ fn is_supported(requirement: SupportRequirement, support: &Result<SystemSupport,
         .is_ok_and(|system| requirement.unavailable_reason(system).is_none())
 }
 
+const SERVICES_PATH: &str = r"SYSTEM\CurrentControlSet\Services\";
+
+fn disabled_service_name(definition: &PolicyDefinition) -> Option<&'static str> {
+    if definition.value_name != "Start" || definition.desired != RegistryValue::Dword(4) {
+        return None;
+    }
+    definition
+        .path
+        .strip_prefix(SERVICES_PATH)
+        .filter(|name| !name.is_empty() && !name.contains('\\'))
+}
+
+fn reapplied_message(names: &[&str]) -> String {
+    if names.len() <= 3 {
+        format!("Reapplied {}", names.join(", "))
+    } else {
+        format!("Reapplied {} settings", names.len())
+    }
+}
+
 fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
     let config = state.config();
     let mut repaired = 0_u64;
@@ -91,6 +97,11 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
             Ok(true) => {
                 repaired += 1;
                 repaired_policy_names.push(definition.name);
+                if let Some(service) = disabled_service_name(&definition)
+                    && let Err(error) = services::stop(service)
+                {
+                    errors.push(error);
+                }
             }
             Ok(false) => {}
             Err(error) => errors.push(error),
@@ -112,19 +123,6 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
             Ok(false) => {}
             Err(error) => errors.push(error),
         }
-    }
-
-    if repaired_policy_names
-        .iter()
-        .any(|name| name.contains("Connected User Experiences"))
-    {
-        let _ = crate::windows::run_hidden("sc.exe", &["stop", "DiagTrack"]);
-    }
-    if repaired_policy_names
-        .iter()
-        .any(|name| name.contains("push service"))
-    {
-        let _ = crate::windows::run_hidden("sc.exe", &["stop", "dmwappushservice"]);
     }
 
     let enabled_network = catalog::network_blocks()
@@ -156,11 +154,7 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
     }
 
     if !repaired_policy_names.is_empty() {
-        state.add_activity(
-            "Policy",
-            format!("Reapplied {} settings", repaired_policy_names.len()),
-            true,
-        );
+        state.add_activity("Policy", reapplied_message(&repaired_policy_names), true);
     }
     if autostart_repairs > 0 {
         state.add_activity(
@@ -172,9 +166,26 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
     EnforcementOutcome { repaired, errors }
 }
 
-pub fn enforce_runtime(state: &AppState) -> Result<u64, String> {
-    let _guard = BusyGuard::acquire(state)?;
-    enforce_runtime_inner(state).complete(state)
+fn run_enforcement(
+    app: &AppHandle,
+    state: &AppState,
+    guard: MutexGuard<'_, ()>,
+    run: impl FnOnce() -> Result<u64, String>,
+) -> Result<u64, String> {
+    if !state.config().enforcement_enabled {
+        return Ok(0);
+    }
+    publish_live_state(app, state);
+    let result = run();
+    drop(guard);
+    publish_live_state(app, state);
+    result
+}
+
+pub fn enforce_runtime(app: &AppHandle, state: &AppState) -> Result<u64, String> {
+    run_enforcement(app, state, state.lock_enforcement(), || {
+        enforce_runtime_inner(state).complete(state)
+    })
 }
 
 fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
@@ -199,7 +210,7 @@ fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
         {
             continue;
         }
-        if task_states.get(definition.id).copied().unwrap_or(true) {
+        if task_states.get(definition.id) != Some(&TaskStatus::Enabled) {
             continue;
         }
         match tasks::disable(definition.path) {
@@ -245,71 +256,101 @@ fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
     EnforcementOutcome { repaired, errors }
 }
 
-pub fn enforce_slow(state: &AppState) -> Result<u64, String> {
-    let _guard = BusyGuard::acquire(state)?;
-    enforce_slow_inner(state).complete(state)
+pub fn enforce_slow(app: &AppHandle, state: &AppState) -> Result<u64, String> {
+    run_enforcement(app, state, state.lock_enforcement(), || {
+        enforce_slow_inner(state).complete(state)
+    })
 }
 
 pub fn enforce_all(app: &AppHandle, state: &AppState) -> Result<u64, String> {
-    let _guard = BusyGuard::acquire(state)?;
-    let mut outcome = enforce_runtime_inner(state);
-    let killed = process_enforcement::enforce(app, state);
-    outcome.merge(enforce_slow_inner(state));
-    let result = outcome.complete(state).map(|repaired| repaired + killed);
-    publish_live_state(app, state);
-    result
+    let guard = state
+        .try_lock_enforcement()
+        .ok_or_else(|| "Enforcement is already running".to_owned())?;
+    run_enforcement(app, state, guard, || {
+        let mut outcome = enforce_runtime_inner(state);
+        let killed = process_enforcement::enforce(app, state);
+        outcome.merge(enforce_slow_inner(state));
+        outcome.complete(state).map(|repaired| repaired + killed)
+    })
 }
 
-pub fn start(app: AppHandle, state: AppState) {
-    let ready_receiver = process_enforcement::start_monitor(app.clone(), state.clone());
+fn spawn_reconciliation(
+    app: AppHandle,
+    state: AppState,
+    interval: Duration,
+    enforce: fn(&AppHandle, &AppState) -> Result<u64, String>,
+) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(interval).await;
+            let task_app = app.clone();
+            let task_state = state.clone();
+            if let Err(error) =
+                tauri::async_runtime::spawn_blocking(move || enforce(&task_app, &task_state)).await
+            {
+                state.add_activity(
+                    "Error",
+                    format!("Enforcement stopped unexpectedly: {error}"),
+                    false,
+                );
+                publish_live_state(&app, &state);
+            }
+        }
+    });
+}
+
+pub fn start(app: AppHandle, state: AppState) -> Result<(), String> {
+    let ready_receiver = process_enforcement::start_monitor(app.clone(), state.clone())?;
 
     let initial_app = app.clone();
     let initial_state = state.clone();
     tauri::async_runtime::spawn(async move {
-        let _ = tokio::time::timeout(Duration::from_secs(10), ready_receiver).await;
-        let _ = tauri::async_runtime::spawn_blocking(move || {
-            let _ = enforce_all(&initial_app, &initial_state);
-        })
-        .await;
+        let _ = tokio::time::timeout(MONITOR_READY_TIMEOUT, ready_receiver).await;
+        let _ =
+            tauri::async_runtime::spawn_blocking(move || enforce_all(&initial_app, &initial_state))
+                .await;
     });
 
-    let runtime_app = app.clone();
-    let runtime_state = state.clone();
-    tauri::async_runtime::spawn(async move {
-        loop {
-            tokio::time::sleep(RUNTIME_RECONCILIATION_INTERVAL).await;
-            let app = runtime_app.clone();
-            let state = runtime_state.clone();
-            let _ = tauri::async_runtime::spawn_blocking(move || {
-                let result = enforce_runtime(&state);
-                publish_live_state(&app, &state);
-                result
-            })
-            .await;
-        }
-    });
-
-    let slow_app = app;
-    tauri::async_runtime::spawn(async move {
-        loop {
-            tokio::time::sleep(SLOW_RECONCILIATION_INTERVAL).await;
-            let app = slow_app.clone();
-            let state = state.clone();
-            let _ = tauri::async_runtime::spawn_blocking(move || {
-                let result = enforce_slow(&state);
-                publish_live_state(&app, &state);
-                result
-            })
-            .await;
-        }
-    });
+    spawn_reconciliation(
+        app.clone(),
+        state.clone(),
+        RUNTIME_RECONCILIATION_INTERVAL,
+        enforce_runtime,
+    );
+    spawn_reconciliation(app, state, SLOW_RECONCILIATION_INTERVAL, enforce_slow);
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         EnforcementOutcome, RUNTIME_RECONCILIATION_INTERVAL, SLOW_RECONCILIATION_INTERVAL,
+        disabled_service_name, reapplied_message,
     };
+    use crate::catalog;
+
+    #[test]
+    fn stops_services_disabled_by_policies() {
+        let services = catalog::policies()
+            .iter()
+            .filter_map(disabled_service_name)
+            .collect::<Vec<_>>();
+
+        assert!(services.contains(&"DiagTrack"));
+        assert!(services.contains(&"dmwappushservice"));
+        assert!(services.contains(&"WerSvc"));
+        assert!(services.contains(&"MapsBroker"));
+        assert!(services.contains(&"RetailDemo"));
+    }
+
+    #[test]
+    fn names_a_few_reapplied_settings() {
+        assert_eq!(reapplied_message(&["A", "B"]), "Reapplied A, B");
+        assert_eq!(
+            reapplied_message(&["A", "B", "C", "D"]),
+            "Reapplied 4 settings"
+        );
+    }
 
     #[test]
     fn combined_enforcement_keeps_earlier_errors() {

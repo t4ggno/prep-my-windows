@@ -1,3 +1,4 @@
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -136,63 +137,92 @@ fn record_stopped_processes(
 }
 
 fn enabled_rules(state: &AppState) -> Vec<ProcessRule> {
-    state
-        .config()
+    let config = state.config();
+    if !config.enforcement_enabled {
+        return Vec::new();
+    }
+    config
         .process_rules
         .into_iter()
         .filter(|rule| rule.enabled)
         .collect()
 }
 
+fn report_errors(app: &AppHandle, state: &AppState, errors: &[String]) {
+    if errors.is_empty() {
+        return;
+    }
+    for error in errors {
+        state.add_activity("Error", error, false);
+    }
+    publish_live_state(app, state);
+}
+
 pub fn enforce(app: &AppHandle, state: &AppState) -> u64 {
     let rules = enabled_rules(state);
-    let stopped = processes::enforce(&rules, |key| state.consume_process_allowance(key));
-    record_stopped_processes(app, state, stopped)
+    let outcome = processes::enforce(&rules, |key| state.consume_process_allowance(key));
+    report_errors(app, state, &outcome.errors);
+    record_stopped_processes(app, state, outcome.stopped)
 }
 
 fn enforce_started(app: &AppHandle, state: &AppState, process_id: u32, process_name: &str) {
     let rules = enabled_rules(state);
-    let stopped = processes::enforce_started(process_id, process_name, &rules, |key| {
+    match processes::enforce_started(process_id, process_name, &rules, |key| {
         state.consume_process_allowance(key)
-    });
-    if let Some(stopped) = stopped {
-        record_stopped_processes(app, state, vec![stopped]);
+    }) {
+        Ok(Some(stopped)) => {
+            record_stopped_processes(app, state, vec![stopped]);
+        }
+        Ok(None) => {}
+        Err(error) => report_errors(app, state, &[error]),
     }
 }
 
-fn run_monitor(
-    app: AppHandle,
-    state: AppState,
-    mut ready: Option<tokio::sync::oneshot::Sender<()>>,
-) {
+fn watch_once(
+    app: &AppHandle,
+    state: &AppState,
+    ready: &mut Option<tokio::sync::oneshot::Sender<()>>,
+) -> Result<(), String> {
+    let result = processes::watch_starts(
+        || {
+            if let Some(ready) = ready.take() {
+                let _ = ready.send(());
+            }
+        },
+        |process_id, process_name| enforce_started(app, state, process_id, process_name),
+    );
+    if let Some(ready) = ready.take() {
+        let _ = ready.send(());
+    }
+    result
+}
+
+fn run_monitor(app: AppHandle, state: AppState, ready: tokio::sync::oneshot::Sender<()>) {
+    let mut ready = Some(ready);
     loop {
-        let result = processes::watch_starts(
-            || {
-                if let Some(ready) = ready.take() {
-                    let _ = ready.send(());
-                }
-            },
-            |process_id, process_name| {
-                enforce_started(&app, &state, process_id, process_name);
-            },
-        );
-        if let Some(ready) = ready.take() {
-            let _ = ready.send(());
-        }
-        if let Err(error) = result {
-            state.add_activity("Error", error, false);
-            publish_live_state(&app, &state);
+        let error =
+            match panic::catch_unwind(AssertUnwindSafe(|| watch_once(&app, &state, &mut ready))) {
+                Ok(Ok(())) => None,
+                Ok(Err(error)) => Some(error),
+                Err(_) => Some("Process event monitoring stopped unexpectedly".to_owned()),
+            };
+        if let Some(error) = error {
+            report_errors(&app, &state, &[error]);
         }
         std::thread::sleep(MONITOR_RETRY_INTERVAL);
     }
 }
 
-pub fn start_monitor(app: AppHandle, state: AppState) -> tokio::sync::oneshot::Receiver<()> {
+pub fn start_monitor(
+    app: AppHandle,
+    state: AppState,
+) -> Result<tokio::sync::oneshot::Receiver<()>, String> {
     let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
-    tauri::async_runtime::spawn_blocking(move || {
-        run_monitor(app, state, Some(ready_sender));
-    });
-    ready_receiver
+    std::thread::Builder::new()
+        .name("process-monitor".to_owned())
+        .spawn(move || run_monitor(app, state, ready_sender))
+        .map_err(|error| format!("Could not start process monitoring: {error}"))?;
+    Ok(ready_receiver)
 }
 
 #[cfg(test)]
@@ -201,7 +231,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use super::{apply_notification_action, should_notify};
+    use super::{apply_notification_action, enabled_rules, should_notify};
     use crate::state::AppState;
     use crate::windows::notifications::ProcessNotificationAction;
     use crate::windows::processes::StoppedProcess;
@@ -218,6 +248,20 @@ mod tests {
             allowance_key: "app.exe".to_owned(),
             launch: None,
         }
+    }
+
+    #[test]
+    fn rules_apply_only_while_enforcement_is_enabled() {
+        let directory = temporary_directory();
+        let state = AppState::load(&directory).unwrap();
+        assert!(enabled_rules(&state).is_empty());
+
+        state
+            .update_config(|config| config.enforcement_enabled = true)
+            .unwrap();
+
+        assert!(!enabled_rules(&state).is_empty());
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

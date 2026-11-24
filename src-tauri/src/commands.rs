@@ -1,239 +1,163 @@
 use std::fs;
 use std::path::PathBuf;
 
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::catalog;
 use crate::engine;
 use crate::models::{
-    AddProcessRuleRequest, AppConfig, AutostartEntry, NetworkView, PackageView, PolicyView,
-    RuntimeSettings, ScheduledTaskView, Snapshot,
+    AddProcessRuleRequest, AppConfig, AutostartEntry, ProcessInfo, ProcessRule, RuntimeSettings,
+    Snapshot, SystemInfo,
 };
 use crate::process_enforcement;
+use crate::snapshot;
 use crate::state::AppState;
-use crate::windows::{
-    autostart, hosts, packages, processes, registry, startup_task, system_settings, tasks,
-};
+use crate::windows::{autostart, processes, startup_task};
 
-#[tauri::command]
-pub async fn get_snapshot(state: tauri::State<'_, AppState>) -> Result<Snapshot, String> {
-    let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || build_snapshot(&state))
-        .await
-        .map_err(|error| format!("Could not load application state: {error}"))?
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CatalogSection {
+    Policies,
+    Packages,
+    NetworkBlocks,
+    ScheduledTasks,
 }
 
-fn build_snapshot(state: &AppState) -> Result<Snapshot, String> {
-    let config = state.config();
-    let system = crate::windows::system_info()?;
-    let support = crate::windows::support_info()?;
-    let definitions = catalog::configured_policies(&config);
-    let mut policies = definitions
-        .iter()
-        .map(|definition| {
-            if let Some(reason) = definition.support.unavailable_reason(&support) {
-                return Ok(PolicyView {
-                    id: definition.id.to_owned(),
-                    name: definition.name.to_owned(),
-                    category: definition.category.to_owned(),
-                    scope: definition.hive.label().to_owned(),
-                    enabled: config.policies.get(definition.id).copied().unwrap_or(false),
-                    compliant: false,
-                    current: "Unavailable".to_owned(),
-                    wanted: definition.desired.label(),
-                    available: false,
-                    unavailable_reason: Some(reason),
-                });
+impl CatalogSection {
+    fn contains(self, id: &str) -> bool {
+        match self {
+            Self::Policies => {
+                catalog::policies().iter().any(|item| item.id == id)
+                    || catalog::system_settings().iter().any(|item| item.id == id)
             }
-            let current = registry::read_policy(definition)?;
-            let wanted = definition.desired.label();
-            Ok(PolicyView {
-                id: definition.id.to_owned(),
-                name: definition.name.to_owned(),
-                category: definition.category.to_owned(),
-                scope: definition.hive.label().to_owned(),
-                enabled: config.policies.get(definition.id).copied().unwrap_or(false),
-                compliant: definition.desired.is_satisfied_by(current.as_deref()),
-                current: current.unwrap_or_else(|| "Not set".to_owned()),
-                wanted,
-                available: true,
-                unavailable_reason: None,
-            })
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-    let system_policy_views = catalog::system_settings()
-        .into_iter()
-        .map(|definition| {
-            if let Some(reason) = definition.support.unavailable_reason(&support) {
-                return Ok(PolicyView {
-                    id: definition.id.to_owned(),
-                    name: definition.name.to_owned(),
-                    category: definition.category.to_owned(),
-                    scope: definition.scope.to_owned(),
-                    enabled: config.policies.get(definition.id).copied().unwrap_or(false),
-                    compliant: false,
-                    current: "Unavailable".to_owned(),
-                    wanted: "Unavailable".to_owned(),
-                    available: false,
-                    unavailable_reason: Some(reason),
-                });
-            }
-            let current = system_settings::read(definition.kind)?;
-            Ok(PolicyView {
-                id: definition.id.to_owned(),
-                name: definition.name.to_owned(),
-                category: definition.category.to_owned(),
-                scope: definition.scope.to_owned(),
-                enabled: config.policies.get(definition.id).copied().unwrap_or(false),
-                compliant: current.compliant,
-                current: current.current,
-                wanted: current.wanted,
-                available: current.available,
-                unavailable_reason: current.unavailable_reason,
-            })
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-    policies.extend(system_policy_views);
-
-    let installed_packages = packages::list()?;
-    let package_views = catalog::packages()
-        .into_iter()
-        .map(|definition| {
-            let matches = installed_packages
-                .iter()
-                .filter(|package| package.name.eq_ignore_ascii_case(definition.pattern));
-            let mut installed = false;
-            let mut provisioned = false;
-            for package in matches {
-                installed = true;
-                provisioned |= package.provisioned;
-            }
-            PackageView {
-                id: definition.id.to_owned(),
-                name: definition.name.to_owned(),
-                package_name: definition.pattern.to_owned(),
-                enabled: config.packages.get(definition.id).copied().unwrap_or(false),
-                installed,
-                provisioned,
-            }
-        })
-        .collect();
-
-    let network_definitions = catalog::network_blocks();
-    let blocked = hosts::statuses(&network_definitions)?;
-    let network_blocks = network_definitions
-        .into_iter()
-        .zip(blocked)
-        .map(|(definition, blocked)| NetworkView {
-            id: definition.id.to_owned(),
-            domain: definition.domain.to_owned(),
-            enabled: config
-                .network_blocks
-                .get(definition.id)
-                .copied()
-                .unwrap_or(false),
-            blocked,
-        })
-        .collect();
-
-    let task_definitions = catalog::scheduled_tasks();
-    let task_states = tasks::states(&task_definitions)?;
-    let scheduled_tasks = task_definitions
-        .into_iter()
-        .map(|definition| ScheduledTaskView {
-            id: definition.id.to_owned(),
-            name: definition.name.to_owned(),
-            path: definition.path.to_owned(),
-            enabled: config
-                .scheduled_tasks
-                .get(definition.id)
-                .copied()
-                .unwrap_or(false),
-            disabled: task_states.get(definition.id).copied().unwrap_or(true),
-        })
-        .collect();
-
-    Ok(Snapshot {
-        system,
-        status: state.status(),
-        settings: config,
-        policies,
-        packages: package_views,
-        installed_packages,
-        network_blocks,
-        scheduled_tasks,
-        activity: state.activity(),
-    })
-}
-
-fn replace_profile(state: &AppState, config: AppConfig) -> Result<(), String> {
-    config.validate()?;
-    let previous_start_with_windows = state.config().start_with_windows;
-    let start_with_windows = config.start_with_windows;
-    startup_task::configure(start_with_windows)?;
-    if let Err(error) = state.replace_config(config) {
-        if previous_start_with_windows != start_with_windows {
-            startup_task::configure(previous_start_with_windows).map_err(|rollback_error| {
-                format!(
-                    "{error}; could not restore the startup task after the profile update failed: {rollback_error}"
-                )
-            })?;
+            Self::Packages => catalog::packages().iter().any(|item| item.id == id),
+            Self::NetworkBlocks => catalog::network_blocks().iter().any(|item| item.id == id),
+            Self::ScheduledTasks => catalog::scheduled_tasks().iter().any(|item| item.id == id),
         }
-        return Err(error);
     }
+}
+
+async fn run_blocking<T: Send + 'static>(
+    failure: &str,
+    task: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(task)
+        .await
+        .map_err(|error| format!("{failure}: {error}"))?
+}
+
+fn update_with_startup_task(
+    state: &AppState,
+    start_with_windows: bool,
+    update: impl FnOnce(&AppState) -> Result<(), String>,
+) -> Result<(), String> {
+    let previous_start_with_windows = state.config().start_with_windows;
+    startup_task::configure(start_with_windows)?;
+    let Err(error) = update(state) else {
+        return Ok(());
+    };
+    if previous_start_with_windows != start_with_windows {
+        startup_task::configure(previous_start_with_windows).map_err(|rollback_error| {
+            format!("{error}; could not restore the startup task: {rollback_error}")
+        })?;
+    }
+    Err(error)
+}
+
+async fn replace_profile(
+    app: tauri::AppHandle,
+    state: AppState,
+    mut config: AppConfig,
+) -> Result<(), String> {
+    config.validate()?;
+    config.enforcement_enabled = state.config().enforcement_enabled;
+    run_blocking("Could not apply profile", move || {
+        update_with_startup_task(&state, config.start_with_windows, |state| {
+            state.replace_config(config)
+        })?;
+        engine::enforce_all(&app, &state)
+    })
+    .await?;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn set_catalog_item(
+pub async fn get_snapshot(
     state: tauri::State<'_, AppState>,
-    section: String,
-    id: String,
+    system: tauri::State<'_, SystemInfo>,
+) -> Result<Snapshot, String> {
+    let state = state.inner().clone();
+    let system = system.inner().clone();
+    run_blocking("Could not load application state", move || {
+        Ok(snapshot::build(&state, system))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn set_catalog_items(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    section: CatalogSection,
+    ids: Vec<String>,
     enabled: bool,
 ) -> Result<(), String> {
-    let valid = match section.as_str() {
-        "policies" => {
-            catalog::policies().iter().any(|item| item.id == id)
-                || catalog::system_settings().iter().any(|item| item.id == id)
-        }
-        "packages" => catalog::packages().iter().any(|item| item.id == id),
-        "networkBlocks" => catalog::network_blocks().iter().any(|item| item.id == id),
-        "scheduledTasks" => catalog::scheduled_tasks().iter().any(|item| item.id == id),
-        _ => return Err("Unknown catalog section".to_owned()),
-    };
-    if !valid {
+    if ids.is_empty() || !ids.iter().all(|id| section.contains(id)) {
         return Err("Unknown catalog item".to_owned());
     }
     state.update_config(|config| {
-        let values = match section.as_str() {
-            "policies" => &mut config.policies,
-            "packages" => &mut config.packages,
-            "networkBlocks" => &mut config.network_blocks,
-            "scheduledTasks" => &mut config.scheduled_tasks,
-            _ => unreachable!(),
+        let values = match section {
+            CatalogSection::Policies => &mut config.policies,
+            CatalogSection::Packages => &mut config.packages,
+            CatalogSection::NetworkBlocks => &mut config.network_blocks,
+            CatalogSection::ScheduledTasks => &mut config.scheduled_tasks,
         };
-        values.insert(id, enabled);
+        values.extend(ids.into_iter().map(|id| (id, enabled)));
     })?;
 
-    let state = state.inner().clone();
-    match section.as_str() {
-        "policies" if enabled => {
-            tauri::async_runtime::spawn_blocking(move || engine::enforce_runtime(&state))
-                .await
-                .map_err(|error| format!("Could not apply policy: {error}"))??
+    let enforce: fn(&tauri::AppHandle, &AppState) -> Result<u64, String> = match section {
+        CatalogSection::Policies if enabled => engine::enforce_runtime,
+        CatalogSection::NetworkBlocks => engine::enforce_runtime,
+        CatalogSection::Packages | CatalogSection::ScheduledTasks if enabled => {
+            engine::enforce_slow
         }
-        "networkBlocks" => {
-            tauri::async_runtime::spawn_blocking(move || engine::enforce_runtime(&state))
-                .await
-                .map_err(|error| format!("Could not apply network rules: {error}"))??
-        }
-        "packages" | "scheduledTasks" if enabled => {
-            tauri::async_runtime::spawn_blocking(move || engine::enforce_slow(&state))
-                .await
-                .map_err(|error| format!("Could not apply rule: {error}"))??
-        }
-        _ => 0,
+        _ => return Ok(()),
     };
+    let state = state.inner().clone();
+    run_blocking("Could not apply rule", move || enforce(&app, &state)).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_policy_choice(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    id: String,
+    choice: String,
+) -> Result<(), String> {
+    let definition = catalog::policies()
+        .into_iter()
+        .find(|definition| definition.id == id)
+        .ok_or_else(|| "Unknown setting".to_owned())?;
+    let selected = definition
+        .choice(&choice)
+        .ok_or_else(|| "Unknown option".to_owned())?;
+    let enabled = state.update_config(|config| {
+        if selected.value == definition.desired {
+            config.policy_choices.remove(&id);
+        } else {
+            config.policy_choices.insert(id.clone(), choice);
+        }
+        config.policies.get(&id).copied().unwrap_or(false)
+    })?;
+    if enabled {
+        let state = state.inner().clone();
+        run_blocking("Could not apply setting", move || {
+            engine::enforce_runtime(&app, &state)
+        })
+        .await?;
+    }
     Ok(())
 }
 
@@ -255,9 +179,10 @@ pub async fn set_process_rule_enabled(
     })?;
     if enabled {
         let state = state.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || process_enforcement::enforce(&app, &state))
-            .await
-            .map_err(|error| format!("Could not apply process rule: {error}"))?;
+        run_blocking("Could not apply process rule", move || {
+            Ok(process_enforcement::enforce(&app, &state))
+        })
+        .await?;
     }
     Ok(())
 }
@@ -296,22 +221,36 @@ pub async fn add_process_rule(
     } else {
         request.name.trim().to_owned()
     };
-    state.update_config(|config| {
-        config.process_rules.push(crate::models::ProcessRule {
+    let executable_path = request
+        .executable_path
+        .filter(|path| !path.trim().is_empty());
+    state.try_update_config(|config| {
+        let duplicate = config.process_rules.iter().any(|rule| {
+            rule.executable_name.eq_ignore_ascii_case(executable_name)
+                && match (&rule.executable_path, &executable_path) {
+                    (Some(existing), Some(requested)) => existing.eq_ignore_ascii_case(requested),
+                    (None, None) => true,
+                    _ => false,
+                }
+        });
+        if duplicate {
+            return Err(format!("A rule for {executable_name} already exists"));
+        }
+        config.process_rules.push(ProcessRule {
             id: Uuid::new_v4().to_string(),
             name,
             executable_name: executable_name.to_owned(),
-            executable_path: request
-                .executable_path
-                .filter(|path| !path.trim().is_empty()),
+            executable_path,
             enabled: true,
             built_in: false,
         });
+        Ok(())
     })?;
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || process_enforcement::enforce(&app, &state))
-        .await
-        .map_err(|error| format!("Could not apply process rule: {error}"))?;
+    run_blocking("Could not apply process rule", move || {
+        Ok(process_enforcement::enforce(&app, &state))
+    })
+    .await?;
     Ok(())
 }
 
@@ -324,17 +263,13 @@ pub fn remove_process_rule(state: tauri::State<'_, AppState>, id: String) -> Res
 }
 
 #[tauri::command]
-pub async fn list_processes() -> Result<Vec<crate::models::ProcessInfo>, String> {
-    tauri::async_runtime::spawn_blocking(processes::list)
-        .await
-        .map_err(|error| format!("Could not list processes: {error}"))
+pub async fn list_processes() -> Result<Vec<ProcessInfo>, String> {
+    run_blocking("Could not list processes", processes::list).await
 }
 
 #[tauri::command]
 pub async fn list_autostarts() -> Result<Vec<AutostartEntry>, String> {
-    tauri::async_runtime::spawn_blocking(autostart::list)
-        .await
-        .map_err(|error| format!("Could not list autostarts: {error}"))?
+    run_blocking("Could not list autostarts", autostart::list).await
 }
 
 #[tauri::command]
@@ -343,10 +278,13 @@ pub async fn block_autostart(
     entry: AutostartEntry,
 ) -> Result<(), String> {
     let rule = autostart::rule_from_entry(&entry);
-    let enforcement_rule = rule.clone();
-    tauri::async_runtime::spawn_blocking(move || autostart::enforce_rule(&enforcement_rule))
-        .await
-        .map_err(|error| format!("Could not disable autostart: {error}"))??;
+    if state.config().enforcement_enabled {
+        let enforcement_rule = rule.clone();
+        run_blocking("Could not disable autostart", move || {
+            autostart::enforce_rule(&enforcement_rule)
+        })
+        .await?;
+    }
     state.update_config(|config| {
         config
             .blocked_autostarts
@@ -365,7 +303,8 @@ pub fn remove_autostart_rule(state: tauri::State<'_, AppState>, id: String) -> R
 }
 
 #[tauri::command]
-pub fn add_custom_package(
+pub async fn add_custom_package(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     package_name: String,
 ) -> Result<(), String> {
@@ -382,7 +321,13 @@ pub fn add_custom_package(
             config.custom_packages.push(package_name.to_owned());
             config.custom_packages.sort();
         }
+    })?;
+    let state = state.inner().clone();
+    run_blocking("Could not remove app", move || {
+        engine::enforce_slow(&app, &state)
     })
+    .await?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -399,31 +344,50 @@ pub fn remove_custom_package(
 
 #[tauri::command]
 pub async fn update_runtime_settings(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     settings: RuntimeSettings,
 ) -> Result<(), String> {
     settings.validate()?;
-    let previous_start_with_windows = state.config().start_with_windows;
-    let start_with_windows = settings.start_with_windows;
-    startup_task::configure(start_with_windows)?;
-    if let Err(error) = state.update_config(|config| {
-        config.start_with_windows = start_with_windows;
-        config.active_hours_start = settings.active_hours_start;
-        config.active_hours_end = settings.active_hours_end;
-    }) {
-        if previous_start_with_windows != start_with_windows {
-            startup_task::configure(previous_start_with_windows).map_err(|rollback_error| {
-                format!(
-                    "{error}; could not restore the startup task after the settings update failed: {rollback_error}"
-                )
-            })?;
-        }
-        return Err(error);
-    }
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || engine::enforce_runtime(&state))
-        .await
-        .map_err(|error| format!("Could not apply settings: {error}"))??;
+    run_blocking("Could not apply settings", move || {
+        update_with_startup_task(&state, settings.start_with_windows, |state| {
+            state.update_config(|config| {
+                config.start_with_windows = settings.start_with_windows;
+                config.active_hours_start = settings.active_hours_start;
+                config.active_hours_end = settings.active_hours_end;
+            })
+        })?;
+        engine::enforce_runtime(&app, &state)
+    })
+    .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_enforcement_enabled(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    state.update_config(|config| config.enforcement_enabled = enabled)?;
+    state.add_activity(
+        "Enforcement",
+        if enabled {
+            "Enforcement enabled"
+        } else {
+            "Enforcement disabled"
+        },
+        true,
+    );
+    crate::events::publish_live_state(&app, &state);
+    if enabled {
+        run_blocking("Could not enforce policy", move || {
+            engine::enforce_all(&app, &state)
+        })
+        .await?;
+    }
     Ok(())
 }
 
@@ -433,9 +397,10 @@ pub async fn enforce_now(
     state: tauri::State<'_, AppState>,
 ) -> Result<u64, String> {
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&app, &state))
-        .await
-        .map_err(|error| format!("Could not enforce policy: {error}"))?
+    run_blocking("Could not enforce policy", move || {
+        engine::enforce_all(&app, &state)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -443,12 +408,7 @@ pub async fn reset_profile(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    replace_profile(&state, AppConfig::default())?;
-    let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&app, &state))
-        .await
-        .map_err(|error| format!("Could not apply profile: {error}"))??;
-    Ok(())
+    replace_profile(app, state.inner().clone(), AppConfig::default()).await
 }
 
 #[tauri::command]
@@ -469,15 +429,11 @@ pub async fn import_profile(
         .map_err(|error| format!("Could not read profile: {error}"))?;
     let config: AppConfig = serde_json::from_str(&content)
         .map_err(|error| format!("Could not parse profile: {error}"))?;
-    replace_profile(&state, config)?;
-    let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || engine::enforce_all(&app, &state))
-        .await
-        .map_err(|error| format!("Could not apply profile: {error}"))??;
-    Ok(())
+    replace_profile(app, state.inner().clone(), config).await
 }
 
 #[tauri::command]
-pub fn clear_activity(state: tauri::State<'_, AppState>) {
+pub fn clear_activity(app: tauri::AppHandle, state: tauri::State<'_, AppState>) {
     state.clear_activity();
+    crate::events::publish_live_state(&app, &state);
 }

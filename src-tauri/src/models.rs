@@ -55,6 +55,13 @@ impl RegistryValue {
 }
 
 #[derive(Clone, Debug)]
+pub struct PolicyChoice {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub value: RegistryValue,
+}
+
+#[derive(Clone, Debug)]
 pub struct PolicyDefinition {
     pub id: &'static str,
     pub name: &'static str,
@@ -63,6 +70,7 @@ pub struct PolicyDefinition {
     pub path: &'static str,
     pub value_name: &'static str,
     pub desired: RegistryValue,
+    pub choices: &'static [PolicyChoice],
     pub support: SupportRequirement,
 }
 
@@ -70,6 +78,21 @@ impl PolicyDefinition {
     pub fn with_support(mut self, support: SupportRequirement) -> Self {
         self.support = support;
         self
+    }
+
+    pub fn with_choices(mut self, choices: &'static [PolicyChoice]) -> Self {
+        self.choices = choices;
+        self
+    }
+
+    pub fn choice(&self, id: &str) -> Option<&'static PolicyChoice> {
+        self.choices.iter().find(|choice| choice.id == id)
+    }
+
+    pub fn selected_choice(&self) -> Option<&'static PolicyChoice> {
+        self.choices
+            .iter()
+            .find(|choice| choice.value == self.desired)
     }
 }
 
@@ -247,7 +270,11 @@ pub enum AutostartKind {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
+    #[serde(default)]
+    pub enforcement_enabled: bool,
     pub policies: BTreeMap<String, bool>,
+    #[serde(default)]
+    pub policy_choices: BTreeMap<String, String>,
     pub packages: BTreeMap<String, bool>,
     pub network_blocks: BTreeMap<String, bool>,
     pub scheduled_tasks: BTreeMap<String, bool>,
@@ -271,6 +298,13 @@ impl AppConfig {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PolicyChoiceView {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PolicyView {
     pub id: String,
     pub name: String,
@@ -280,6 +314,8 @@ pub struct PolicyView {
     pub compliant: bool,
     pub current: String,
     pub wanted: String,
+    pub choices: Vec<PolicyChoiceView>,
+    pub choice: Option<String>,
     pub available: bool,
     pub unavailable_reason: Option<String>,
 }
@@ -322,15 +358,24 @@ pub struct ScheduledTaskView {
     pub name: String,
     pub path: String,
     pub enabled: bool,
-    pub disabled: bool,
+    pub status: TaskStatus,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TaskStatus {
+    Enabled,
+    Disabled,
+    Missing,
+    Unknown,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessInfo {
-    pub pid: u32,
     pub name: String,
     pub executable_path: String,
+    pub instances: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -358,7 +403,6 @@ pub struct ActivityEvent {
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatus {
-    pub running: bool,
     pub busy: bool,
     pub last_enforced_at: Option<String>,
     pub repaired_total: u64,
@@ -388,6 +432,7 @@ pub struct Snapshot {
     pub network_blocks: Vec<NetworkView>,
     pub scheduled_tasks: Vec<ScheduledTaskView>,
     pub activity: Vec<ActivityEvent>,
+    pub issues: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]

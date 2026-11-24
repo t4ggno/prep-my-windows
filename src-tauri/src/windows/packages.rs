@@ -1,8 +1,12 @@
+use std::time::Duration;
+
 use serde::Deserialize;
 
 use crate::models::InstalledPackage;
 
-use super::run_powershell_json;
+use super::{DEFAULT_TIMEOUT, run_powershell_json};
+
+const PACKAGE_REMOVAL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -50,7 +54,7 @@ foreach ($package in @($provisioned | Where-Object { $_.DisplayName -notin $pack
 }
 ConvertTo-Json -InputObject @($items) -Compress
 "#;
-    let packages: Vec<PowerShellPackage> = run_powershell_json(script)?;
+    let packages: Vec<PowerShellPackage> = run_powershell_json(script, DEFAULT_TIMEOUT)?;
     Ok(packages
         .into_iter()
         .map(|package| InstalledPackage {
@@ -111,5 +115,5 @@ foreach ($target in $targets) {{
 "#
     );
 
-    run_powershell_json(&script)
+    run_powershell_json(&script, PACKAGE_REMOVAL_TIMEOUT)
 }

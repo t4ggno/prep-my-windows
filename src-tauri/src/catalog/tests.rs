@@ -1,0 +1,252 @@
+use std::collections::HashSet;
+
+use super::{
+    configured_policies, network_blocks, packages, policies, scheduled_tasks, system_settings,
+};
+use crate::models::{AppConfig, RegistryValue};
+
+fn all_unique(values: impl IntoIterator<Item = String>) -> bool {
+    let mut unique = HashSet::new();
+    values.into_iter().all(|value| unique.insert(value))
+}
+
+#[test]
+fn catalog_identifiers_are_unique() {
+    assert!(all_unique(
+        policies()
+            .into_iter()
+            .map(|item| item.id.to_owned())
+            .chain(system_settings().into_iter().map(|item| item.id.to_owned()))
+    ));
+    assert!(all_unique(
+        packages().into_iter().map(|item| item.id.to_owned())
+    ));
+    assert!(all_unique(
+        network_blocks().into_iter().map(|item| item.id.to_owned())
+    ));
+    assert!(all_unique(
+        scheduled_tasks().into_iter().map(|item| item.id.to_owned())
+    ));
+}
+
+#[test]
+fn catalog_targets_are_unique() {
+    assert!(all_unique(policies().into_iter().map(|item| format!(
+        "{:?}\\{}\\{}",
+        item.hive,
+        item.path.to_ascii_lowercase(),
+        item.value_name.to_ascii_lowercase()
+    ))));
+    assert!(all_unique(
+        packages()
+            .into_iter()
+            .map(|item| item.pattern.to_ascii_lowercase())
+    ));
+    assert!(all_unique(
+        scheduled_tasks()
+            .into_iter()
+            .map(|item| item.path.to_ascii_lowercase())
+    ));
+}
+
+#[test]
+fn default_profile_enables_every_catalog_item() {
+    let config = AppConfig::default();
+    assert!(config.policies.values().all(|enabled| *enabled));
+    assert!(config.packages.values().all(|enabled| *enabled));
+    assert!(config.network_blocks.values().all(|enabled| *enabled));
+    assert!(config.scheduled_tasks.values().all(|enabled| *enabled));
+    assert!(config.process_rules.iter().all(|rule| rule.enabled));
+}
+
+#[test]
+fn location_configuration_removes_policies_and_enables_consent() {
+    let definitions = policies();
+    for id in [
+        "location",
+        "location-scripting",
+        "location-provider",
+        "app-location",
+    ] {
+        let definition = definitions.iter().find(|item| item.id == id).unwrap();
+        assert_eq!(definition.desired, RegistryValue::Absent);
+        assert!(definition.path.contains(r"SOFTWARE\Policies\"));
+    }
+
+    for id in [
+        "location-sensor",
+        "location-service",
+        "location-service-start",
+        "location-consent",
+        "location-user-consent",
+        "location-desktop-consent",
+    ] {
+        let definition = definitions.iter().find(|item| item.id == id).unwrap();
+        assert_ne!(definition.desired, RegistryValue::Absent);
+        assert!(!definition.path.contains(r"SOFTWARE\Policies\"));
+    }
+
+    assert!(
+        network_blocks()
+            .iter()
+            .all(|definition| definition.domain != "inference.location.live.net")
+    );
+}
+
+#[test]
+fn configured_policies_use_profile_active_hours() {
+    let config = AppConfig {
+        active_hours_start: 21,
+        active_hours_end: 6,
+        ..AppConfig::default()
+    };
+
+    let definitions = configured_policies(&config);
+
+    assert_eq!(
+        definitions
+            .iter()
+            .find(|item| item.id == "update-active-hours-start")
+            .unwrap()
+            .desired,
+        RegistryValue::Dword(21)
+    );
+    assert_eq!(
+        definitions
+            .iter()
+            .find(|item| item.id == "update-active-hours-end")
+            .unwrap()
+            .desired,
+        RegistryValue::Dword(6)
+    );
+}
+
+#[test]
+fn quality_of_life_policies_use_current_windows_settings() {
+    let definitions = policies();
+    let expected = [
+        (
+            "file-extensions",
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            "HideFileExt",
+            RegistryValue::Dword(0),
+        ),
+        (
+            "start-iris-recommendations",
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            "Start_IrisRecommendations",
+            RegistryValue::Dword(0),
+        ),
+        (
+            "start-recent-items",
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            "Start_TrackDocs",
+            RegistryValue::Dword(0),
+        ),
+        (
+            "start-recent-apps",
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Start",
+            "ShowRecentList",
+            RegistryValue::Dword(0),
+        ),
+        (
+            "clipboard-history",
+            r"SOFTWARE\Microsoft\Clipboard",
+            "EnableClipboardHistory",
+            RegistryValue::Dword(1),
+        ),
+        (
+            "taskbar-end-task",
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings",
+            "TaskbarEndTask",
+            RegistryValue::Dword(1),
+        ),
+        (
+            "edge-first-run",
+            r"SOFTWARE\Policies\Microsoft\Edge",
+            "HideFirstRunExperience",
+            RegistryValue::Dword(1),
+        ),
+        (
+            "edge-default-browser-campaign",
+            r"SOFTWARE\Policies\Microsoft\Edge",
+            "DefaultBrowserSettingsCampaignEnabled",
+            RegistryValue::Dword(0),
+        ),
+        (
+            "edge-pdf-handler-recommendations",
+            r"SOFTWARE\Policies\Microsoft\Edge",
+            "ShowPDFDefaultRecommendationsEnabled",
+            RegistryValue::Dword(0),
+        ),
+    ];
+
+    for (id, path, value_name, desired) in expected {
+        let definition = definitions.iter().find(|item| item.id == id).unwrap();
+        assert_eq!(definition.path, path);
+        assert_eq!(definition.value_name, value_name);
+        assert_eq!(definition.desired, desired);
+    }
+
+    let recommended_section = definitions
+        .iter()
+        .find(|item| item.id == "start-recommended-section")
+        .unwrap();
+    assert_eq!(recommended_section.support.minimum_build, 22_621);
+
+    let system_setting_ids = system_settings()
+        .into_iter()
+        .map(|item| item.id)
+        .collect::<HashSet<_>>();
+    assert_eq!(
+        system_setting_ids,
+        HashSet::from([
+            "hibernation",
+            "sticky-keys-shortcut",
+            "filter-keys-shortcut",
+            "toggle-keys-shortcut",
+            "widgets-taskbar-button",
+        ])
+    );
+}
+
+#[test]
+fn policy_choices_include_the_default_value() {
+    for definition in policies().iter().filter(|item| !item.choices.is_empty()) {
+        assert!(
+            definition.selected_choice().is_some(),
+            "{} has no choice for its default value",
+            definition.id
+        );
+        assert!(all_unique(
+            definition.choices.iter().map(|choice| choice.id.to_owned())
+        ));
+        assert!(all_unique(
+            definition.choices.iter().map(|choice| choice.value.label())
+        ));
+    }
+}
+
+#[test]
+fn configured_policies_use_selected_choices() {
+    let mut config = AppConfig::default();
+    config
+        .policy_choices
+        .insert("diagnostic-data".to_owned(), "required".to_owned());
+    config
+        .policy_choices
+        .insert("location".to_owned(), "unknown".to_owned());
+
+    let definitions = configured_policies(&config);
+    let desired = |id: &str| {
+        definitions
+            .iter()
+            .find(|item| item.id == id)
+            .unwrap()
+            .desired
+            .clone()
+    };
+
+    assert_eq!(desired("diagnostic-data"), RegistryValue::Dword(1));
+    assert_eq!(desired("location"), RegistryValue::Absent);
+}

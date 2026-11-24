@@ -1,63 +1,34 @@
 pub mod autostart;
+mod command;
 pub mod hosts;
 pub mod notifications;
 pub mod packages;
 pub mod processes;
 pub mod registry;
+pub mod services;
 pub mod startup_task;
 pub mod system_settings;
 pub mod tasks;
 
+use std::ffi::c_void;
 use std::fs;
-use std::os::windows::process::CommandExt;
+use std::mem::size_of;
 use std::path::PathBuf;
-use std::process::{Command, Output};
 
+use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+use windows_sys::Win32::Security::{
+    GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation,
+};
+use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    MB_ICONERROR, MB_OK, MB_SETFOREGROUND, MessageBoxW,
+};
 use winreg::RegKey;
 use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_64KEY};
 
+pub use command::{DEFAULT_TIMEOUT, run_hidden, run_powershell, run_powershell_json};
+
 use crate::models::{SystemInfo, SystemSupport};
-
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-pub fn run_hidden(program: &str, args: &[&str]) -> Result<Output, String> {
-    Command::new(program)
-        .args(args)
-        .creation_flags(CREATE_NO_WINDOW)
-        .output()
-        .map_err(|error| format!("Could not run {program}: {error}"))
-}
-
-pub fn run_powershell(script: &str) -> Result<String, String> {
-    let output = run_hidden(
-        "powershell.exe",
-        &[
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            script,
-        ],
-    )?;
-
-    if !output.status.success() {
-        let message = String::from_utf8_lossy(&output.stderr).trim().to_owned();
-        return Err(if message.is_empty() {
-            format!("PowerShell exited with {}", output.status)
-        } else {
-            message
-        });
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
-}
-
-pub fn run_powershell_json<T: serde::de::DeserializeOwned>(script: &str) -> Result<T, String> {
-    let output = run_powershell(script)?;
-    serde_json::from_str(&output).map_err(|error| format!("Invalid PowerShell response: {error}"))
-}
 
 fn current_version_key() -> Result<RegKey, String> {
     let local_machine = RegKey::predef(HKEY_LOCAL_MACHINE);
@@ -106,6 +77,46 @@ pub fn support_info() -> Result<SystemSupport, String> {
     })
 }
 
+fn is_elevated() -> Result<bool, String> {
+    let mut token: HANDLE = std::ptr::null_mut();
+    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
+        return Err(format!(
+            "Could not read process access: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let mut elevation = TOKEN_ELEVATION::default();
+    let mut returned = 0_u32;
+    let queried = unsafe {
+        GetTokenInformation(
+            token,
+            TokenElevation,
+            &mut elevation as *mut TOKEN_ELEVATION as *mut c_void,
+            size_of::<TOKEN_ELEVATION>() as u32,
+            &mut returned,
+        )
+    };
+    let query_error = std::io::Error::last_os_error();
+    unsafe { CloseHandle(token) };
+    if queried == 0 {
+        return Err(format!("Could not read process access: {query_error}"));
+    }
+    Ok(elevation.TokenIsElevated != 0)
+}
+
+pub fn show_error_dialog(title: &str, message: &str) {
+    let title = title.encode_utf16().chain([0]).collect::<Vec<_>>();
+    let message = message.encode_utf16().chain([0]).collect::<Vec<_>>();
+    unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            message.as_ptr(),
+            title.as_ptr(),
+            MB_OK | MB_ICONERROR | MB_SETFOREGROUND,
+        );
+    }
+}
+
 pub fn system_info() -> Result<SystemInfo, String> {
     let key = current_version_key()?;
     let mut product_name = key
@@ -121,16 +132,12 @@ pub fn system_info() -> Result<SystemInfo, String> {
     if build >= 22_000 && product_name.starts_with("Windows 10") {
         product_name = product_name.replacen("Windows 10", "Windows 11", 1);
     }
-    let elevated = run_powershell(
-        "$identity=[Security.Principal.WindowsIdentity]::GetCurrent(); $principal=[Security.Principal.WindowsPrincipal]::new($identity); $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator).ToString().ToLowerInvariant()",
-    )? == "true";
-
     Ok(SystemInfo {
         product_name,
         display_version,
         build_number,
         is_windows_11: build >= 22_000,
-        is_elevated: elevated,
+        is_elevated: is_elevated()?,
     })
 }
 

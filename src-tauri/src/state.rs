@@ -1,29 +1,54 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use chrono::Utc;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, MutexGuard, RwLock};
 use uuid::Uuid;
 
 use crate::catalog;
 use crate::models::{ActivityEvent, AppConfig, EngineStatus};
 
-fn add_missing_policy_defaults(config: &mut AppConfig) {
-    for definition in catalog::policies() {
-        config
-            .policies
-            .entry(definition.id.to_owned())
-            .or_insert(true);
+fn normalize_catalog_selections(config: &mut AppConfig) {
+    fn enable_missing<'a>(
+        selections: &mut BTreeMap<String, bool>,
+        ids: impl IntoIterator<Item = &'a str>,
+    ) {
+        for id in ids {
+            selections.entry(id.to_owned()).or_insert(true);
+        }
     }
-    for definition in catalog::system_settings() {
-        config
-            .policies
-            .entry(definition.id.to_owned())
-            .or_insert(true);
-    }
+
+    enable_missing(
+        &mut config.policies,
+        catalog::policies()
+            .into_iter()
+            .map(|item| item.id)
+            .chain(catalog::system_settings().into_iter().map(|item| item.id)),
+    );
+    enable_missing(
+        &mut config.packages,
+        catalog::packages().into_iter().map(|item| item.id),
+    );
+    enable_missing(
+        &mut config.network_blocks,
+        catalog::network_blocks().into_iter().map(|item| item.id),
+    );
+    enable_missing(
+        &mut config.scheduled_tasks,
+        catalog::scheduled_tasks().into_iter().map(|item| item.id),
+    );
+
+    let policies = catalog::policies();
+    config.policy_choices.retain(|id, choice| {
+        policies.iter().any(|definition| {
+            definition.id == id
+                && definition
+                    .choice(choice)
+                    .is_some_and(|choice| choice.value != definition.desired)
+        })
+    });
 }
 
 #[derive(Clone)]
@@ -37,7 +62,7 @@ struct Inner {
     status: RwLock<EngineStatus>,
     activity: RwLock<Vec<ActivityEvent>>,
     process_allowances: RwLock<HashSet<String>>,
-    busy: AtomicBool,
+    enforcement: Mutex<()>,
 }
 
 impl AppState {
@@ -53,19 +78,16 @@ impl AppState {
         } else {
             AppConfig::default()
         };
-        add_missing_policy_defaults(&mut config);
+        normalize_catalog_selections(&mut config);
         config.validate()?;
         let state = Self {
             inner: Arc::new(Inner {
                 config_path,
                 config: RwLock::new(config),
-                status: RwLock::new(EngineStatus {
-                    running: true,
-                    ..EngineStatus::default()
-                }),
+                status: RwLock::new(EngineStatus::default()),
                 activity: RwLock::new(Vec::new()),
                 process_allowances: RwLock::new(HashSet::new()),
-                busy: AtomicBool::new(false),
+                enforcement: Mutex::new(()),
             }),
         };
         state.save()?;
@@ -77,7 +99,7 @@ impl AppState {
     }
 
     pub fn replace_config(&self, mut config: AppConfig) -> Result<(), String> {
-        add_missing_policy_defaults(&mut config);
+        normalize_catalog_selections(&mut config);
         config.validate()?;
         let mut current = self.inner.config.write();
         self.save_config(&config)?;
@@ -109,25 +131,24 @@ impl AppState {
     fn save_config(&self, config: &AppConfig) -> Result<(), String> {
         let content = serde_json::to_string_pretty(config)
             .map_err(|error| format!("Could not serialize profile: {error}"))?;
-        fs::write(&self.inner.config_path, content)
+        let temporary_path = self.inner.config_path.with_extension("json.tmp");
+        fs::write(&temporary_path, content)
+            .and_then(|()| fs::rename(&temporary_path, &self.inner.config_path))
             .map_err(|error| format!("Could not save profile: {error}"))
     }
 
     pub fn status(&self) -> EngineStatus {
         let mut status = self.inner.status.read().clone();
-        status.busy = self.inner.busy.load(Ordering::Relaxed);
+        status.busy = self.inner.enforcement.is_locked();
         status
     }
 
-    pub fn begin_enforcement(&self) -> bool {
-        self.inner
-            .busy
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
+    pub fn lock_enforcement(&self) -> MutexGuard<'_, ()> {
+        self.inner.enforcement.lock()
     }
 
-    pub fn finish_enforcement(&self) {
-        self.inner.busy.store(false, Ordering::Release);
+    pub fn try_lock_enforcement(&self) -> Option<MutexGuard<'_, ()>> {
+        self.inner.enforcement.try_lock()
     }
 
     pub fn complete_enforcement(&self, repaired: u64, killed: u64, last_error: Option<String>) {
@@ -184,7 +205,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use super::{AppState, add_missing_policy_defaults};
+    use super::{AppState, normalize_catalog_selections};
     use crate::models::AppConfig;
 
     fn temporary_directory() -> std::path::PathBuf {
@@ -192,19 +213,49 @@ mod tests {
     }
 
     #[test]
-    fn adds_new_policy_defaults_without_overwriting_preferences() {
+    fn adds_new_catalog_defaults_without_overwriting_preferences() {
         let mut config = AppConfig::default();
         config.policies.remove("location-sensor");
         config.policies.remove("hibernation");
         config.policies.remove("start-recent-apps");
         config.policies.insert("location".to_owned(), false);
+        config.packages.remove("candy-crush");
+        config.packages.insert("clipchamp".to_owned(), false);
+        config.scheduled_tasks.remove("device-census");
+        config.network_blocks.remove("events");
 
-        add_missing_policy_defaults(&mut config);
+        normalize_catalog_selections(&mut config);
 
         assert_eq!(config.policies.get("location-sensor"), Some(&true));
         assert_eq!(config.policies.get("hibernation"), Some(&true));
         assert_eq!(config.policies.get("start-recent-apps"), Some(&true));
         assert_eq!(config.policies.get("location"), Some(&false));
+        assert_eq!(config.packages.get("candy-crush"), Some(&true));
+        assert_eq!(config.packages.get("clipchamp"), Some(&false));
+        assert_eq!(config.scheduled_tasks.get("device-census"), Some(&true));
+        assert_eq!(config.network_blocks.get("events"), Some(&true));
+    }
+
+    #[test]
+    fn keeps_only_valid_non_default_policy_choices() {
+        let mut config = AppConfig::default();
+        for (id, choice) in [
+            ("diagnostic-data", "required"),
+            ("defender-sample-submission", "never"),
+            ("location", "unknown"),
+            ("removed-setting", "off"),
+        ] {
+            config
+                .policy_choices
+                .insert(id.to_owned(), choice.to_owned());
+        }
+
+        normalize_catalog_selections(&mut config);
+
+        assert_eq!(
+            config.policy_choices.into_iter().collect::<Vec<_>>(),
+            [("diagnostic-data".to_owned(), "required".to_owned())]
+        );
     }
 
     #[test]
@@ -264,6 +315,25 @@ mod tests {
                 .enabled
         );
         assert!(!reloaded.process_rules[0].enabled);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn new_profiles_start_with_enforcement_disabled() {
+        let directory = temporary_directory();
+        let state = AppState::load(&directory).unwrap();
+        assert!(!state.config().enforcement_enabled);
+
+        state
+            .update_config(|config| config.enforcement_enabled = true)
+            .unwrap();
+
+        assert!(
+            AppState::load(&directory)
+                .unwrap()
+                .config()
+                .enforcement_enabled
+        );
         fs::remove_dir_all(directory).unwrap();
     }
 
