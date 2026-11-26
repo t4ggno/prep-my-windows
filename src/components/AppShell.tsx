@@ -11,6 +11,7 @@ import {
   Settings2,
   ShieldCheck,
 } from "lucide-react";
+import markUrl from "@/assets/mark.svg";
 import { Button } from "@/components/ui/button";
 import { useNow } from "@/hooks/useNow";
 import { engineState, engineStateLabels } from "@/lib/engineState";
@@ -63,12 +64,7 @@ export function AppShell({
     <div className="app-frame">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          <img className="brand-mark" src={markUrl} alt="" />
           <span>Prep My Windows</span>
         </div>
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, AlertTriangle, LoaderCircle, X } from "lucide-react";
 import { api } from "@/api";
+import markUrl from "@/assets/mark.svg";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialog, type ConfirmRequest } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -247,12 +248,7 @@ export default function App() {
   if (loading && !snapshot) {
     return (
       <div className="startup-screen">
-        <div className="brand-mark large">
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
+        <img className="brand-mark large" src={markUrl} alt="" />
         <LoaderCircle className="size-5 animate-spin text-sky-400" />
       </div>
     );

@@ -94,32 +94,14 @@
   }
 
   .brand-mark {
-    display: grid;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     flex: none;
-    grid-template-columns: 1fr 1.08fr;
-    grid-template-rows: 1fr 1.08fr;
-    gap: 2px;
-    transform: perspective(30px) rotateY(-5deg);
   }
 
   .brand-mark.large {
-    width: 40px;
-    height: 40px;
-    gap: 3px;
-  }
-
-  .brand-mark span {
-    background: #38bdf8;
-  }
-
-  .brand-mark span:nth-child(2) {
-    background: #7dd3fc;
-  }
-
-  .brand-mark span:nth-child(3) {
-    background: #0ea5e9;
+    width: 44px;
+    height: 44px;
   }
 
   .nav-list {
