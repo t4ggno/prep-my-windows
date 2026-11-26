@@ -43,5 +43,17 @@
         "installMode": "currentUser"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlEQkI3Qjc2QThGMzY0RDgKUldUWVpQT29kbnU3blhuU1gxUlFoTDFHZDcvZ2tlVUZ5QjhEVHdLK09pamlHMm00d1VDa0laSHgK",
+      "endpoints": [
+        "https://github.com/t4ggno/prep-my-windows/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

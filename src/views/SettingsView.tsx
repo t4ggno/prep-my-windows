@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { Download, LoaderCircle, RotateCcw, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { Download, LoaderCircle, RefreshCw, RotateCcw, Upload } from "lucide-react";
 import { ViewHeader } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import type { DesktopUpdate } from "@/hooks/useDesktopUpdate";
 import type { AppSettings, RuntimeSettings, SystemInfo } from "@/types";
 
 const hours = Array.from({ length: 24 }, (_, hour) => hour);
@@ -64,6 +66,7 @@ export function SettingsView({
   onExport,
   onImport,
   onReset,
+  updater,
 }: {
   settings: AppSettings;
   system: SystemInfo;
@@ -72,9 +75,11 @@ export function SettingsView({
   onExport: () => void;
   onImport: () => void;
   onReset: () => void;
+  updater: DesktopUpdate;
 }) {
   const saved = savedSettings(settings);
   const [draft, setDraft] = useState<RuntimeSettings | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   const values = draft ?? saved;
   const dirty =
     draft !== null &&
@@ -84,6 +89,18 @@ export function SettingsView({
   const validation = activeHoursError(values);
   const saving = pending.has("settings");
   const profileBusy = pending.has("profile");
+
+  useEffect(() => {
+    let disposed = false;
+    void getVersion()
+      .then((installed) => {
+        if (!disposed) setVersion(installed);
+      })
+      .catch((failure: unknown) => console.error("Could not read the app version", failure));
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   function update(change: Partial<RuntimeSettings>) {
     setDraft({ ...values, ...change });
@@ -160,6 +177,27 @@ export function SettingsView({
           </Button>
         </div>
       </section>
+
+      {updater.supported && (
+        <section className="settings-card">
+          <div className="section-label">Updates</div>
+          <div className="settings-row">
+            <span>{version ? `Version ${version}` : "Version"}</span>
+            <Button
+              variant="secondary"
+              onClick={updater.check}
+              disabled={updater.phase === "checking"}
+            >
+              {updater.phase === "checking" ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
+              Check for updates
+            </Button>
+          </div>
+        </section>
+      )}
 
       <section className="settings-card">
         <div className="section-label">System</div>

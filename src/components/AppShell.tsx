@@ -12,7 +12,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import markUrl from "@/assets/mark.svg";
+import { UpdateStatus } from "@/components/UpdateStatus";
 import { Button } from "@/components/ui/button";
+import type { DesktopUpdate } from "@/hooks/useDesktopUpdate";
 import { useNow } from "@/hooks/useNow";
 import { engineState, engineStateLabels } from "@/lib/engineState";
 import { cn, formatRelative, formatTimestamp } from "@/lib/utils";
@@ -43,6 +45,7 @@ export function AppShell({
   switchingEnforcement,
   onEnforce,
   onSetEnforcementEnabled,
+  updater,
   children,
 }: {
   section: Section;
@@ -54,6 +57,7 @@ export function AppShell({
   switchingEnforcement: boolean;
   onEnforce: () => void;
   onSetEnforcementEnabled: (enabled: boolean) => void;
+  updater: DesktopUpdate;
   children: React.ReactNode;
 }) {
   const now = useNow();
@@ -98,6 +102,7 @@ export function AppShell({
 
       <main className="main-panel">
         <div className="topbar">
+          <UpdateStatus updater={updater} />
           <div className="text-xs text-zinc-500" title={formatTimestamp(status.lastEnforcedAt)}>
             Last enforced {formatRelative(status.lastEnforcedAt, now)}
           </div>

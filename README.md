@@ -23,7 +23,7 @@ Turning off a rule stops Prep My Windows from enforcing it again, but it does no
 
 ## Install and open
 
-1. Download the Prep My Windows installer (the `.exe` file ending in `_x64-setup.exe`).
+1. Download `prep-my-windows-windows-x64-setup.exe` from the latest release.
 2. Open the installer and follow the prompts. It installs for your Windows account.
 3. Open **Prep My Windows** from the Start menu or its desktop shortcut.
 4. Select **Yes** when Windows requests administrator access. The app cannot run without it.
@@ -44,6 +44,14 @@ The installer is not digitally signed, so Microsoft Defender SmartScreen may war
 | **Settings** | Changes Windows Update active hours, startup behavior, and profile import or export. |
 
 For switches, **on** means Prep My Windows will enforce the displayed action: apply the wanted setting, remove the app, disable the task, block the endpoint, or stop the process. While enforcement is enabled, use **Enforce now** to check and apply every enabled rule immediately. **Turn all on** and **Turn all off** change every rule currently shown on **Windows policy**, **Apps**, and **Network**, so you can combine them with search and filters. Press **Ctrl+F** to search the current page.
+
+## Updates
+
+Prep My Windows checks for a new release when it starts and every six hours. When one is available, choose **Update and restart**, or choose when to be reminded again: in 1 hour, tomorrow, in 1 week, or not until the next release. To check right away, select **Check for updates** on the **Settings** page.
+
+**Hide** keeps a download running in the background, with its progress shown in the top bar. **Cancel download** stops it without installing anything. If enforcement is running when the download finishes, installation starts once it completes. The app then closes, installs the update, and starts again.
+
+Updates are signed, and the app installs only releases signed with its built-in key. Versions released before 1.4.0 have no updater and must be updated manually once.
 
 ## Settings and profiles
 

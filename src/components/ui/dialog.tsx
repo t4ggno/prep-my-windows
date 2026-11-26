@@ -7,8 +7,9 @@ export const Dialog = DialogPrimitive.Root;
 export function DialogContent({
   className,
   children,
+  closable = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { closable?: boolean }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm data-[state=closed]:animate-out data-[state=open]:animate-in" />
@@ -20,12 +21,14 @@ export function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close
-          className="absolute right-4 top-4 rounded-md p-1 text-zinc-500 hover:bg-white/[0.06] hover:text-white"
-          aria-label="Close"
-        >
-          <X className="size-4" />
-        </DialogPrimitive.Close>
+        {closable && (
+          <DialogPrimitive.Close
+            className="absolute right-4 top-4 rounded-md p-1 text-zinc-500 hover:bg-white/[0.06] hover:text-white"
+            aria-label="Close"
+          >
+            <X className="size-4" />
+          </DialogPrimitive.Close>
+        )}
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );

@@ -5,8 +5,10 @@ import { api } from "@/api";
 import markUrl from "@/assets/mark.svg";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialog, type ConfirmRequest } from "@/components/ConfirmDialog";
+import { UpdateDialog } from "@/components/UpdateDialog";
 import { Button } from "@/components/ui/button";
 import { useAppData } from "@/hooks/useAppData";
+import { useDesktopUpdate } from "@/hooks/useDesktopUpdate";
 import { useResource } from "@/hooks/useResource";
 import { errorMessage } from "@/lib/utils";
 import { ActivityView } from "@/views/ActivityView";
@@ -75,6 +77,7 @@ function updateSettings(
 export default function App() {
   const { snapshot, setSnapshot, loading, error, setError, pending, loadSnapshot, mutate } =
     useAppData();
+  const updater = useDesktopUpdate();
   const [section, setSection] = useState<Section>("overview");
   const [confirmation, setConfirmation] = useState<ConfirmRequest | null>(null);
   const [dismissedIssues, setDismissedIssues] = useState("");
@@ -278,6 +281,7 @@ export default function App() {
       switchingEnforcement={pending.has("enforcement")}
       onEnforce={enforceNow}
       onSetEnforcementEnabled={setEnforcementEnabled}
+      updater={updater}
     >
       {error && (
         <div className="banner error" role="alert">
@@ -363,9 +367,11 @@ export default function App() {
           onExport={exportProfile}
           onImport={importProfile}
           onReset={resetProfile}
+          updater={updater}
         />
       )}
       <ConfirmDialog request={confirmation} onClose={() => setConfirmation(null)} />
+      <UpdateDialog updater={updater} />
     </AppShell>
   );
 }

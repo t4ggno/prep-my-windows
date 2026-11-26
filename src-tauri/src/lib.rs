@@ -1,3 +1,4 @@
+mod app_update;
 mod catalog;
 mod commands;
 mod engine;
@@ -116,6 +117,10 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(app_update::AppUpdateState::default())
         .setup(|app| initialize(app).inspect_err(|error| report_startup_error(error)))
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
@@ -138,6 +143,12 @@ pub fn run() {
             commands::export_profile,
             commands::import_profile,
             commands::clear_activity,
+            app_update::app_update_available,
+            app_update::prepare_app_update,
+            app_update::finish_app_update,
+            app_update::download_app_update,
+            app_update::cancel_app_update_download,
+            app_update::install_app_update,
         ])
         .run(tauri::generate_context!());
     if let Err(error) = result {

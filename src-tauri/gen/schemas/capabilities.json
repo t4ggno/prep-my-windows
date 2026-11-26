@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Desktop permissions","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open","dialog:allow-save"]}}
+{"default":{"identifier":"default","description":"Desktop permissions","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open","dialog:allow-save","updater:default","process:allow-restart",{"identifier":"opener:allow-open-url","allow":[{"url":"https://github.com/t4ggno/prep-my-windows/releases/*"}]}]}}

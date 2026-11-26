@@ -1,6 +1,7 @@
 name: Windows Release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -8,59 +9,148 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: prep-my-windows-release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          node <<'NODE'
+          const { execFileSync } = require("node:child_process");
+          const fs = require("node:fs");
+
+          const output = (name, value) => fs.appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${value}\n`);
+          const readVersion = (revision, path) => {
+            try {
+              const text = revision
+                ? execFileSync("git", ["show", `${revision}:${path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+                : fs.readFileSync(path, "utf8");
+              return path.endsWith(".toml")
+                ? /^version\s*=\s*"([^"]+)"/m.exec(text)?.[1] ?? ""
+                : JSON.parse(text).version ?? "";
+            } catch {
+              return "";
+            }
+          };
+
+          const configuration = JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json", "utf8"));
+          const version = configuration.version;
+          const versions = {
+            "package.json": readVersion("", "package.json"),
+            "src-tauri/Cargo.toml": readVersion("", "src-tauri/Cargo.toml"),
+            "src-tauri/tauri.conf.json": version,
+          };
+          if (!/^\d+\.\d+\.\d+$/.test(version) || Object.values(versions).some((value) => value !== version)) {
+            console.error(`Release versions must match and be stable: ${JSON.stringify(versions)}`);
+            process.exit(1);
+          }
+
+          const before = process.env.BEFORE_SHA ?? "";
+          const unchanged =
+            process.env.EVENT_NAME === "push" &&
+            before.length > 0 &&
+            !/^0+$/.test(before) &&
+            readVersion(before, "src-tauri/tauri.conf.json") === version;
+          if (unchanged) console.log(`Version stayed at ${version}; skipping the release.`);
+
+          output("should_release", unchanged ? "false" : "true");
+          output("version", version);
+          output("tag_name", `v${version}`);
+          output("title", `${configuration.productName} v${version}`);
+          NODE
+
+      - name: Create draft release
+        id: release
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+          RELEASE_TITLE: ${{ steps.version.outputs.title }}
+        run: |
+          if gh release view "$TAG_NAME" --json isDraft > existing-release.json 2>/dev/null; then
+            if [ "$(node -p 'require("./existing-release.json").isDraft')" != "true" ]; then
+              echo "Release $TAG_NAME is already published. Bump the version before releasing." >&2
+              exit 1
+            fi
+            gh release edit "$TAG_NAME" --title "$RELEASE_TITLE" --target "$GITHUB_SHA"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+          else
+            gh release create "$TAG_NAME" --draft --generate-notes --target "$GITHUB_SHA" --title "$RELEASE_TITLE"
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Node
+        if: steps.version.outputs.should_release == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
 
       - name: Install Rust stable
+        if: steps.version.outputs.should_release == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
+        if: steps.version.outputs.should_release == 'true'
         run: npm ci
 
-      - name: Set release metadata
-        shell: pwsh
-        run: |
-          $config = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
-          $version = $config.version
-          $productName = $config.productName
-
-          if (-not $version -or -not $productName) {
-            throw "Tauri productName and version are required"
-          }
-
-          "RELEASE_TAG=v$version-build.$env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT" >> $env:GITHUB_ENV
-          "RELEASE_TITLE=$productName v$version (build $env:GITHUB_RUN_ID.$env:GITHUB_RUN_ATTEMPT)" >> $env:GITHUB_ENV
-
       - name: Build Windows installer
+        if: steps.version.outputs.should_release == 'true'
         run: npm run tauri -- build
 
-      - name: Publish GitHub Release
-        shell: pwsh
+      - name: Sign update package
+        if: steps.version.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          $installers = @(Get-ChildItem src-tauri/target/release/bundle/nsis -Filter *-setup.exe -File)
+          shopt -s nullglob
+          installers=(src-tauri/target/release/bundle/nsis/*-setup.exe)
+          if [ "${#installers[@]}" -ne 1 ]; then
+            echo "Expected one NSIS installer, found ${#installers[@]}" >&2
+            exit 1
+          fi
+          mkdir -p release-assets
+          cp "${installers[0]}" release-assets/prep-my-windows-windows-x64-setup.exe
+          node scripts/update-manifest.mjs sign release-assets
 
-          if ($installers.Count -eq 0) {
-            throw "No NSIS installer was generated"
-          }
+      - name: Upload release assets
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+        run: |
+          gh release upload "$TAG_NAME" release-assets/prep-my-windows-windows-x64-setup.exe release-assets/prep-my-windows-windows-x64-setup.exe.sig --clobber
+          gh api "repos/$GH_REPO/releases/$(gh release view "$TAG_NAME" --json databaseId --jq .databaseId)" > release.json
+          node scripts/update-manifest.mjs build release-assets release.json
+          gh release upload "$TAG_NAME" release-assets/latest.json --clobber
+          gh release view "$TAG_NAME" --json assets > release-assets.json
+          node scripts/update-manifest.mjs verify release-assets.json
 
-          $installerPaths = @($installers | ForEach-Object FullName)
-          gh release create $env:RELEASE_TAG @installerPaths `
-            --generate-notes `
-            --target $env:GITHUB_SHA `
-            --title $env:RELEASE_TITLE
+      - name: Publish release
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+        run: gh release edit "$TAG_NAME" --draft=false --latest
 
-          if ($LASTEXITCODE -ne 0) {
-            throw "GitHub Release creation failed"
-          }
+      - name: Delete draft release on failure
+        if: failure() && steps.release.outputs.created == 'true'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag_name }}
+        run: gh release delete "$TAG_NAME" --yes
