@@ -7,12 +7,12 @@ Prep My Windows applies a personal configuration to Windows 11 and keeps the sel
 > [!WARNING]
 > **Enforcement starts off.** On first launch, the built-in profile is selected but nothing is applied, so you can review and adjust the rules first. Select **Enable** in the top bar and confirm to apply every enabled rule at once; from then on, selections take effect immediately. Rule switches and most action buttons do not wait for a separate **Save** or **Apply** step. **Disable** stops all enforcement again without restoring changes already made. The active-hours and **Start with Windows** controls require **Save settings**.
 
-The default profile is broad: all built-in rules are selected, including app-removal and process rules for Microsoft and third-party software. Use Prep My Windows only on a Windows installation you intend to configure this way.
+The default profile is broad: nearly all built-in rules are selected, including app-removal and process rules for Microsoft and third-party software. A few rules that change personal preferences or remove protections start off, such as taskbar alignment, File Explorer layout, camera and microphone blocks, driver-update exclusion, and automatic device encryption. Use Prep My Windows only on a Windows installation you intend to configure this way.
 
 - App removal affects all users on the PC and prevents removed packages from being added for new users. Turning a rule off does not reinstall an app.
 - Process rules force matching programs to close as soon as the app detects them and can discard unsaved work. The notification can allow the stopped app once or disable its rule permanently.
 - Blocking an autostart entry can remove it or disable its service or scheduled task. Removing the rule later does not recreate or re-enable the original entry.
-- The default Windows policy changes system-wide behavior, including whether Windows asks for approval before administrator-level changes, diagnostics, Copilot and other AI features, cloud features, fast startup, game capture, Windows Update restarts, Defender sample submission, software installed by device firmware, several background services, Windows User Choice Protection (takes effect after a restart), and Edge. Network blocks may also prevent related Microsoft services from connecting.
+- The default Windows policy changes system-wide behavior, including whether Windows asks for approval before administrator-level changes, diagnostics, app permissions, Copilot and other AI features, search, cloud features, fast startup, network use in standby, game capture, mouse acceleration, GPU scheduling, the File Explorer context menu, AutoPlay and AutoRun, Remote Assistance, Windows Update restarts, Defender sample submission, software installed by device firmware, several background services, Windows User Choice Protection (takes effect after a restart), and Edge. Some changes take effect only after you sign out or restart. Network blocks may also prevent related Microsoft services from connecting.
 
 Turning off a rule stops Prep My Windows from enforcing it again, but it does not necessarily restore the previous Windows setting. Quitting or uninstalling the app also does not undo changes already made.
 
@@ -35,7 +35,7 @@ The installer is not digitally signed, so Microsoft Defender SmartScreen may war
 | Area | What it does |
 | --- | --- |
 | **Overview** | Shows whether the policy is running, the last enforcement time, rule totals, and recent activity. |
-| **Windows policy** | Lets you search and filter Windows and Edge settings by category or by whether they are applied. **Current** shows the detected value and **Wanted** shows the value the app will enforce. Settings with more than one useful value, such as diagnostic data, service startup, app permissions, location, administrator prompts, Defender sample submission, update sharing, and taskbar search, let you choose that value from a list. The first option is the built-in default. Unavailable settings are disabled and show why they are unsupported. |
+| **Windows policy** | Lets you search and filter Windows and Edge settings by category or by whether they are applied. **Current** shows the detected value and **Wanted** shows the value the app will enforce. Settings with more than one useful value, such as diagnostic data, service startup, app permissions, location, administrator prompts, Defender sample submission, update sharing, and taskbar search, let you choose that value from a list. The first option is the built-in default. Unavailable settings, including services that are not installed, are disabled and show why. |
 | **Apps** | Enables removal rules and lists installed packages. In **Installed**, **Remove** removes a package for all users and adds it to the removal rules. |
 | **Autostart** | Lists programs, services, and tasks that start automatically. **Block** disables the selected entry and keeps it blocked. |
 | **Process rules** | Stops matching programs whenever they run. Add a rule from a running process or by choosing an `.exe` file. **Notify** controls stop notifications without changing the rule. |
@@ -51,7 +51,7 @@ On the **Settings** page, choose the start and end of Windows Update active hour
 
 - **Export** saves a copy of the current profile.
 - **Import** replaces the current profile with the selected profile. It keeps the current **Enable**/**Disable** state.
-- **Reset profile** restores the app's built-in profile, with its rules enabled, after you confirm. It keeps the current **Enable**/**Disable** state and does not restore Windows defaults.
+- **Reset profile** restores the app's built-in profile and its default rule selection after you confirm. It keeps the current **Enable**/**Disable** state and does not restore Windows defaults.
 
 ## Keep running or quit
 

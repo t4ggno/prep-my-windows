@@ -50,9 +50,28 @@ fn catalog_targets_are_unique() {
 }
 
 #[test]
-fn default_profile_enables_every_catalog_item() {
+fn default_profile_follows_catalog_defaults() {
     let config = AppConfig::default();
-    assert!(config.policies.values().all(|enabled| *enabled));
+    for definition in policies() {
+        assert_eq!(
+            config.policies.get(definition.id),
+            Some(&definition.default_enabled),
+            "{}",
+            definition.id
+        );
+    }
+    assert!(
+        policies()
+            .iter()
+            .filter(|definition| definition.default_enabled)
+            .count()
+            > policies().len() * 3 / 4
+    );
+    assert!(
+        system_settings()
+            .iter()
+            .all(|definition| config.policies[definition.id])
+    );
     assert!(config.packages.values().all(|enabled| *enabled));
     assert!(config.network_blocks.values().all(|enabled| *enabled));
     assert!(config.scheduled_tasks.values().all(|enabled| *enabled));

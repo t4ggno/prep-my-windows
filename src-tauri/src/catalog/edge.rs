@@ -133,21 +133,14 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
         (
             "edge-copilot-context",
             "Edge Copilot page context",
-            "CopilotPageContextEnabled",
+            "CopilotPageContext",
             0,
-            0,
+            124,
         ),
         (
             "edge-assets",
             "Edge asset delivery",
             "EdgeAssetDeliveryServiceEnabled",
-            0,
-            0,
-        ),
-        (
-            "edge-copilot-browsing-context",
-            "Edge Copilot browsing context",
-            "CopilotCDPPageContext",
             0,
             0,
         ),
@@ -229,28 +222,6 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             0,
         ),
         (
-            "edge-collections",
-            "Edge collections",
-            "EdgeCollectionsEnabled",
-            0,
-            0,
-        ),
-        (
-            "edge-follow",
-            "Edge creator follow",
-            "EdgeFollowEnabled",
-            0,
-            0,
-        ),
-        (
-            "edge-mini-menu",
-            "Edge text selection menu",
-            "QuickSearchShowMiniMenu",
-            0,
-            0,
-        ),
-        ("edge-web-widget", "Edge bar", "WebWidgetAllowed", 0, 0),
-        (
             "edge-default-browser",
             "Edge default browser check",
             "DefaultBrowserSettingEnabled",
@@ -263,6 +234,91 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "ConfigureDoNotTrack",
             1,
             0,
+        ),
+        (
+            "edge-search-bar",
+            "Edge search bar on desktop",
+            "SearchbarAllowed",
+            0,
+            117,
+        ),
+        (
+            "edge-first-run-import",
+            "Edge automatic data import",
+            "AutoImportAtFirstRun",
+            4,
+            77,
+        ),
+        ("edge-drop", "Edge Drop", "EdgeEDropEnabled", 0, 104),
+        (
+            "edge-editor-proofing",
+            "Edge Microsoft Editor proofing",
+            "MicrosoftEditorProofingEnabled",
+            0,
+            105,
+        ),
+        (
+            "edge-editor-synonyms",
+            "Edge Microsoft Editor synonyms",
+            "MicrosoftEditorSynonymsEnabled",
+            0,
+            105,
+        ),
+        (
+            "edge-text-prediction",
+            "Edge text prediction",
+            "TextPredictionEnabled",
+            0,
+            104,
+        ),
+        (
+            "edge-payment-method-query",
+            "Edge saved payment method check",
+            "PaymentMethodQueryEnabled",
+            0,
+            80,
+        ),
+        (
+            "edge-visual-search",
+            "Edge visual search",
+            "VisualSearchEnabled",
+            0,
+            95,
+        ),
+        (
+            "edge-ai-themes",
+            "Edge AI-generated themes",
+            "AIGenThemesEnabled",
+            0,
+            122,
+        ),
+        (
+            "edge-app-launcher",
+            "Edge new tab app launcher",
+            "NewTabPageAppLauncherEnabled",
+            0,
+            108,
+        ),
+        (
+            "edge-essentials-button",
+            "Edge browser essentials button",
+            "PinBrowserEssentialsToolbarButton",
+            0,
+            114,
+        ),
+        (
+            "edge-standalone-sidebar",
+            "Edge sidebar on desktop",
+            "StandaloneHubsSidebarEnabled",
+            0,
+            114,
+        ),
+        (
+            "edge-trending-suggestions",
+            "Edge trending search suggestions",
+            "AddressBarTrendingSuggestEnabled",
+            0,
+            135,
         ),
     ]
     .into_iter()
@@ -291,6 +347,27 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             0
         )
         .with_choices(choices::EDGE_DIAGNOSTIC_DATA),
+        policy!(
+            "edge-tracking-prevention",
+            "Edge tracking prevention",
+            CATEGORY,
+            Lm,
+            EDGE_POLICIES,
+            "TrackingPrevention",
+            3
+        )
+        .with_choices(choices::EDGE_TRACKING_PREVENTION)
+        .with_support(SupportRequirement::edge(78)),
+        policy!(
+            "edge-experimentation",
+            "Edge experiments",
+            CATEGORY,
+            Lm,
+            EDGE_POLICIES,
+            "ExperimentationAndConfigurationServiceControl",
+            1
+        )
+        .with_choices(choices::EDGE_EXPERIMENTATION),
         policy!(
             "edge-update-desktop-shortcut",
             "Edge desktop shortcut after updates",

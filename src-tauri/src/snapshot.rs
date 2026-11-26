@@ -7,7 +7,7 @@ use crate::models::{
     ScheduledTaskView, Snapshot, SupportRequirement, SystemInfo, SystemSupport, TaskStatus,
 };
 use crate::state::AppState;
-use crate::windows::{self, hosts, packages, registry, system_settings, tasks};
+use crate::windows::{self, hosts, packages, registry, services, system_settings, tasks};
 
 struct PolicyViews {
     views: Vec<PolicyView>,
@@ -60,7 +60,13 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
             available: false,
             unavailable_reason: None,
         };
-        if let Some(reason) = unavailable_reason(definition.support, &support) {
+        let reason = unavailable_reason(definition.support, &support).or_else(|| {
+            definition
+                .service_name()
+                .filter(|name| !services::is_installed(name))
+                .map(|_| "Not installed on this PC".to_owned())
+        });
+        if let Some(reason) = reason {
             views.push(PolicyView {
                 unavailable_reason: Some(reason),
                 ..base

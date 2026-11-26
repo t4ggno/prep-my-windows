@@ -312,6 +312,7 @@ fn widgets_taskbar_policy() -> PolicyDefinition {
         desired: RegistryValue::Dword(0),
         choices: &[],
         support: SupportRequirement::windows_build(22_000).blocked_by_user_choice_protection(),
+        default_enabled: true,
     }
 }
 

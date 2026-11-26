@@ -95,3 +95,44 @@ pub(super) const TASKBAR_SEARCH: &[PolicyChoice] = &[
     choice("box", "Search box", RegistryValue::Dword(2)),
     choice("label", "Icon and label", RegistryValue::Dword(3)),
 ];
+
+pub(super) const GPU_SCHEDULING: &[PolicyChoice] = &[
+    choice("on", "On", RegistryValue::Dword(2)),
+    choice("off", "Off", RegistryValue::Dword(1)),
+];
+
+pub(super) const EXPLORER_START_PAGE: &[PolicyChoice] = &[
+    choice("this-pc", "This PC", RegistryValue::Dword(1)),
+    choice("home", "Home", RegistryValue::Dword(2)),
+    choice("downloads", "Downloads", RegistryValue::Dword(3)),
+];
+
+pub(super) const HIDDEN_FILES: &[PolicyChoice] = &[
+    choice("shown", "Shown", RegistryValue::Dword(1)),
+    choice("hidden", "Hidden", RegistryValue::Dword(2)),
+];
+
+pub(super) const TASKBAR_ALIGNMENT: &[PolicyChoice] = &[
+    choice("left", "Left", RegistryValue::Dword(0)),
+    choice("center", "Center", RegistryValue::Dword(1)),
+];
+
+pub(super) const EDGE_TRACKING_PREVENTION: &[PolicyChoice] = &[
+    choice("strict", "Strict", RegistryValue::Dword(3)),
+    choice("balanced", "Balanced", RegistryValue::Dword(2)),
+    choice("basic", "Basic", RegistryValue::Dword(1)),
+];
+
+pub(super) const EDGE_EXPERIMENTATION: &[PolicyChoice] = &[
+    choice(
+        "configurations",
+        "Configurations only",
+        RegistryValue::Dword(1),
+    ),
+    choice("off", "Off", RegistryValue::Dword(0)),
+    choice(
+        "full",
+        "Configurations and experiments",
+        RegistryValue::Dword(2),
+    ),
+];

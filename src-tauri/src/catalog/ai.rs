@@ -187,5 +187,50 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
         )
         .with_choices(choices::SERVICE_MANUAL)
         .with_support(SupportRequirement::windows_build(26_100)),
+        policy!(
+            "search-location",
+            "Search access to location",
+            "Search & AI",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
+            "AllowSearchToUseLocation",
+            0
+        ),
+        policy!(
+            "bing-search",
+            "Bing in Windows Search",
+            "Search & AI",
+            Cu,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Search",
+            "BingSearchEnabled",
+            0
+        ),
+        policy!(
+            "search-microsoft-account",
+            "Search Microsoft account content",
+            "Search & AI",
+            Cu,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
+            "IsMSACloudSearchEnabled",
+            0
+        ),
+        policy!(
+            "search-work-account",
+            "Search work or school account content",
+            "Search & AI",
+            Cu,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
+            "IsAADCloudSearchEnabled",
+            0
+        ),
+        policy!(
+            "search-history",
+            "Search history on this device",
+            "Search & AI",
+            Cu,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
+            "IsDeviceSearchHistoryEnabled",
+            0
+        ),
     ]
 }

@@ -16,6 +16,24 @@ macro_rules! policy {
             desired: $crate::models::RegistryValue::Dword($value),
             choices: &[],
             support: $crate::models::SupportRequirement::any(),
+            default_enabled: true,
+        }
+    };
+}
+
+macro_rules! text_policy {
+    ($id:expr, $name:expr, $category:expr, $hive:expr, $path:expr, $value_name:expr, $value:expr) => {
+        $crate::models::PolicyDefinition {
+            id: $id,
+            name: $name,
+            category: $category,
+            hive: $hive,
+            path: $path,
+            value_name: $value_name,
+            desired: $crate::models::RegistryValue::Text($value),
+            choices: &[],
+            support: $crate::models::SupportRequirement::any(),
+            default_enabled: true,
         }
     };
 }
@@ -32,6 +50,7 @@ macro_rules! absent_policy {
             desired: $crate::models::RegistryValue::Absent,
             choices: &[],
             support: $crate::models::SupportRequirement::any(),
+            default_enabled: true,
         }
     };
 }
@@ -42,6 +61,7 @@ mod choices;
 mod cloud;
 mod diagnostics;
 mod edge;
+mod gaming;
 mod network;
 mod personalization;
 mod privacy;
@@ -50,6 +70,7 @@ mod tasks;
 #[cfg(test)]
 mod tests;
 mod update;
+mod usability;
 
 pub use apps::packages;
 pub use network::network_blocks;
@@ -83,6 +104,8 @@ fn policies_with_active_hours(
     [
         diagnostics::policies(),
         system::policies(),
+        usability::policies(),
+        gaming::policies(),
         personalization::policies(),
         ai::policies(),
         cloud::policies(),
@@ -101,7 +124,7 @@ impl Default for AppConfig {
             enforcement_enabled: false,
             policies: policies()
                 .into_iter()
-                .map(|item| (item.id.to_owned(), true))
+                .map(|item| (item.id.to_owned(), item.default_enabled))
                 .chain(
                     system_settings()
                         .into_iter()

@@ -60,16 +60,10 @@ fn is_supported(requirement: SupportRequirement, support: &Result<SystemSupport,
         .is_ok_and(|system| requirement.unavailable_reason(system).is_none())
 }
 
-const SERVICES_PATH: &str = r"SYSTEM\CurrentControlSet\Services\";
-
 fn disabled_service_name(definition: &PolicyDefinition) -> Option<&'static str> {
-    if definition.value_name != "Start" || definition.desired != RegistryValue::Dword(4) {
-        return None;
-    }
     definition
-        .path
-        .strip_prefix(SERVICES_PATH)
-        .filter(|name| !name.is_empty() && !name.contains('\\'))
+        .service_name()
+        .filter(|_| definition.desired == RegistryValue::Dword(4))
 }
 
 fn reapplied_message(names: &[&str]) -> String {
@@ -94,7 +88,11 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
         if !config.policies.get(definition.id).copied().unwrap_or(false) {
             continue;
         }
-        if !is_supported(definition.support, &support) {
+        if !is_supported(definition.support, &support)
+            || definition
+                .service_name()
+                .is_some_and(|name| !services::is_installed(name))
+        {
             continue;
         }
         match registry::enforce_policy(&definition) {

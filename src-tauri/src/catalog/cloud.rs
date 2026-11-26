@@ -97,5 +97,32 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             0
         )
         .with_choices(choices::UPDATE_PEERS),
+        policy!(
+            "onedrive-before-sign-in",
+            "OneDrive traffic before sign-in",
+            "Cloud & sync",
+            Lm,
+            r"SOFTWARE\Microsoft\OneDrive",
+            "PreventNetworkTrafficPreUserSignIn",
+            1
+        ),
+        policy!(
+            "message-sync",
+            "Text message cloud sync",
+            "Cloud & sync",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\Messaging",
+            "AllowMessageSync",
+            0
+        ),
+        policy!(
+            "phone-pc-linking",
+            "Phone-PC linking",
+            "Cloud & sync",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\System",
+            "EnableMmx",
+            0
+        ),
     ]
 }

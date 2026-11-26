@@ -1,3 +1,4 @@
+use super::choices;
 use crate::models::{PolicyDefinition, RegistryHive, SupportRequirement};
 
 pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<PolicyDefinition> {
@@ -53,5 +54,25 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             "NoAutoRebootWithLoggedOnUsers",
             1
         ),
+        policy!(
+            "update-restart-notifications",
+            "Update restart notifications",
+            "Windows Update",
+            Lm,
+            r"SOFTWARE\Microsoft\WindowsUpdate\UX\Settings",
+            "RestartNotificationsAllowed2",
+            1
+        )
+        .with_choices(choices::ON_OFF),
+        policy!(
+            "update-drivers",
+            "Driver updates",
+            "Windows Update",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate",
+            "ExcludeWUDriversInQualityUpdate",
+            1
+        )
+        .off_by_default(),
     ]
 }

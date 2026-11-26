@@ -100,6 +100,7 @@ mod tests {
     fn formats_registry_values() {
         assert_eq!(RegistryValue::Dword(2).label(), "2");
         assert_eq!(RegistryValue::Text("Deny").label(), "Deny");
+        assert_eq!(RegistryValue::Text("").label(), "Empty");
         assert_eq!(RegistryValue::Absent.label(), "Not set");
     }
 

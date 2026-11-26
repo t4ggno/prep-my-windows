@@ -11,33 +11,43 @@ use crate::catalog;
 use crate::models::{ActivityEvent, AppConfig, EngineStatus};
 
 fn normalize_catalog_selections(config: &mut AppConfig) {
-    fn enable_missing<'a>(
+    fn sync_selections<'a>(
         selections: &mut BTreeMap<String, bool>,
-        ids: impl IntoIterator<Item = &'a str>,
+        items: impl IntoIterator<Item = (&'a str, bool)>,
     ) {
-        for id in ids {
-            selections.entry(id.to_owned()).or_insert(true);
+        let defaults = items.into_iter().collect::<BTreeMap<_, _>>();
+        selections.retain(|id, _| defaults.contains_key(id.as_str()));
+        for (id, enabled) in defaults {
+            selections.entry(id.to_owned()).or_insert(enabled);
         }
     }
 
-    enable_missing(
+    sync_selections(
         &mut config.policies,
         catalog::policies()
             .into_iter()
-            .map(|item| item.id)
-            .chain(catalog::system_settings().into_iter().map(|item| item.id)),
+            .map(|item| (item.id, item.default_enabled))
+            .chain(
+                catalog::system_settings()
+                    .into_iter()
+                    .map(|item| (item.id, true)),
+            ),
     );
-    enable_missing(
+    sync_selections(
         &mut config.packages,
-        catalog::packages().into_iter().map(|item| item.id),
+        catalog::packages().into_iter().map(|item| (item.id, true)),
     );
-    enable_missing(
+    sync_selections(
         &mut config.network_blocks,
-        catalog::network_blocks().into_iter().map(|item| item.id),
+        catalog::network_blocks()
+            .into_iter()
+            .map(|item| (item.id, true)),
     );
-    enable_missing(
+    sync_selections(
         &mut config.scheduled_tasks,
-        catalog::scheduled_tasks().into_iter().map(|item| item.id),
+        catalog::scheduled_tasks()
+            .into_iter()
+            .map(|item| (item.id, true)),
     );
 
     let policies = catalog::policies();
@@ -213,12 +223,15 @@ mod tests {
     }
 
     #[test]
-    fn adds_new_catalog_defaults_without_overwriting_preferences() {
+    fn syncs_catalog_selections_without_overwriting_preferences() {
         let mut config = AppConfig::default();
         config.policies.remove("location-sensor");
         config.policies.remove("hibernation");
         config.policies.remove("start-recent-apps");
+        config.policies.remove("taskbar-alignment");
+        config.policies.insert("hidden-files".to_owned(), true);
         config.policies.insert("location".to_owned(), false);
+        config.policies.insert("removed-setting".to_owned(), true);
         config.packages.remove("candy-crush");
         config.packages.insert("clipchamp".to_owned(), false);
         config.scheduled_tasks.remove("device-census");
@@ -229,7 +242,10 @@ mod tests {
         assert_eq!(config.policies.get("location-sensor"), Some(&true));
         assert_eq!(config.policies.get("hibernation"), Some(&true));
         assert_eq!(config.policies.get("start-recent-apps"), Some(&true));
+        assert_eq!(config.policies.get("taskbar-alignment"), Some(&false));
+        assert_eq!(config.policies.get("hidden-files"), Some(&true));
         assert_eq!(config.policies.get("location"), Some(&false));
+        assert_eq!(config.policies.get("removed-setting"), None);
         assert_eq!(config.packages.get("candy-crush"), Some(&true));
         assert_eq!(config.packages.get("clipchamp"), Some(&false));
         assert_eq!(config.scheduled_tasks.get("device-census"), Some(&true));

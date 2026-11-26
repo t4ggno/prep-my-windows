@@ -40,6 +40,7 @@ impl RegistryValue {
     pub fn label(&self) -> String {
         match self {
             Self::Dword(value) => value.to_string(),
+            Self::Text("") => "Empty".to_owned(),
             Self::Text(value) => (*value).to_owned(),
             Self::Absent => "Not set".to_owned(),
         }
@@ -72,9 +73,26 @@ pub struct PolicyDefinition {
     pub desired: RegistryValue,
     pub choices: &'static [PolicyChoice],
     pub support: SupportRequirement,
+    pub default_enabled: bool,
 }
 
+const SERVICES_PATH: &str = r"SYSTEM\CurrentControlSet\Services\";
+
 impl PolicyDefinition {
+    pub fn off_by_default(mut self) -> Self {
+        self.default_enabled = false;
+        self
+    }
+
+    pub fn service_name(&self) -> Option<&'static str> {
+        if self.value_name != "Start" {
+            return None;
+        }
+        self.path
+            .strip_prefix(SERVICES_PATH)
+            .filter(|name| !name.is_empty() && !name.contains('\\'))
+    }
+
     pub fn with_support(mut self, support: SupportRequirement) -> Self {
         self.support = support;
         self

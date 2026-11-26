@@ -28,6 +28,12 @@ fn is_driver(name: &str) -> bool {
         .is_ok_and(|service_type| service_type & SERVICE_DRIVER_TYPES != 0)
 }
 
+pub fn is_installed(name: &str) -> bool {
+    service_key(name)
+        .and_then(|key| key.get_raw_value("ImagePath"))
+        .is_ok()
+}
+
 pub fn stop(name: &str) -> Result<(), String> {
     if is_driver(name) {
         return Ok(());
@@ -76,11 +82,17 @@ pub fn is_running(name: &str) -> Result<bool, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_driver, is_running};
+    use super::{is_driver, is_installed, is_running};
 
     #[test]
     fn reports_missing_services_as_not_running() {
         assert_eq!(is_running("PrepMyWindowsMissingService"), Ok(false));
+    }
+
+    #[test]
+    fn detects_installed_services() {
+        assert!(is_installed("EventLog"));
+        assert!(!is_installed("PrepMyWindowsMissingService"));
     }
 
     #[test]

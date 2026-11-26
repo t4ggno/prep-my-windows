@@ -3,6 +3,9 @@ use crate::models::{
     PolicyDefinition, RegistryHive, SupportRequirement, SystemSettingDefinition, SystemSettingKind,
 };
 
+const STANDBY_NETWORK: &str =
+    r"SOFTWARE\Policies\Microsoft\Power\PowerSettings\f15576e8-98b7-4186-b944-eafa664402d9";
+
 pub(super) fn policies() -> Vec<PolicyDefinition> {
     use RegistryHive::{CurrentUser as Cu, LocalMachine as Lm};
 
@@ -94,41 +97,141 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             0
         ),
         policy!(
-            "game-dvr",
-            "Game DVR",
-            "Gaming",
-            Cu,
-            r"System\GameConfigStore",
-            "GameDVR_Enabled",
-            0
-        ),
-        policy!(
-            "game-capture",
-            "Background game capture",
-            "Gaming",
-            Cu,
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR",
-            "AppCaptureEnabled",
-            0
-        ),
-        policy!(
-            "game-recording-policy",
-            "Game recording policy",
-            "Gaming",
+            "remote-registry-service",
+            "Remote Registry service",
+            "Windows behavior",
             Lm,
-            r"SOFTWARE\Policies\Microsoft\Windows\GameDVR",
-            "AllowGameDVR",
+            r"SYSTEM\CurrentControlSet\Services\RemoteRegistry",
+            "Start",
+            4
+        )
+        .with_choices(choices::SERVICE_DISABLED),
+        policy!(
+            "fax-service",
+            "Fax service",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Services\Fax",
+            "Start",
+            4
+        )
+        .with_choices(choices::SERVICE_DISABLED),
+        policy!(
+            "media-sharing-service",
+            "Windows Media Player sharing service",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Services\WMPNetworkSvc",
+            "Start",
+            4
+        )
+        .with_choices(choices::SERVICE_DISABLED),
+        policy!(
+            "wallet-service",
+            "Wallet service",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Services\WalletService",
+            "Start",
+            4
+        )
+        .with_choices(choices::SERVICE_DISABLED),
+        policy!(
+            "parental-controls-service",
+            "Parental controls service",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Services\WpcMonSvc",
+            "Start",
+            4
+        )
+        .with_choices(choices::SERVICE_DISABLED),
+        policy!(
+            "link-tracking-service",
+            "Distributed Link Tracking service",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Services\TrkWks",
+            "Start",
+            4
+        )
+        .with_choices(choices::SERVICE_DISABLED),
+        policy!(
+            "sysmain-service",
+            "SysMain service",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Services\SysMain",
+            "Start",
+            4
+        )
+        .with_choices(choices::SERVICE_DISABLED)
+        .off_by_default(),
+        policy!(
+            "long-paths",
+            "Long file paths",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Control\FileSystem",
+            "LongPathsEnabled",
+            1
+        ),
+        policy!(
+            "autorun",
+            "AutoRun on all drives",
+            "Windows behavior",
+            Lm,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
+            "NoDriveTypeAutoRun",
+            255
+        ),
+        policy!(
+            "remote-assistance",
+            "Remote Assistance",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Control\Remote Assistance",
+            "fAllowToGetHelp",
             0
         ),
         policy!(
-            "game-bar-controller",
-            "Game Bar controller button",
-            "Gaming",
-            Cu,
-            r"SOFTWARE\Microsoft\GameBar",
-            "UseNexusForGameBarEnabled",
+            "automatic-device-encryption",
+            "Automatic device encryption",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Control\BitLocker",
+            "PreventDeviceEncryption",
+            1
+        )
+        .off_by_default(),
+        policy!(
+            "standby-network-plugged-in",
+            "Network in standby when plugged in",
+            "Power",
+            Lm,
+            STANDBY_NETWORK,
+            "ACSettingIndex",
             0
         ),
+        policy!(
+            "standby-network-on-battery",
+            "Network in standby on battery",
+            "Power",
+            Lm,
+            STANDBY_NETWORK,
+            "DCSettingIndex",
+            0
+        ),
+        policy!(
+            "power-throttling",
+            "Power throttling",
+            "Power",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling",
+            "PowerThrottlingOff",
+            1
+        )
+        .off_by_default(),
     ]
 }
 

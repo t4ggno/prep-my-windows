@@ -1,5 +1,5 @@
 use super::choices;
-use crate::models::{PolicyDefinition, RegistryHive, RegistryValue, SupportRequirement};
+use crate::models::{PolicyDefinition, RegistryHive, SupportRequirement};
 
 pub(super) fn policies() -> Vec<PolicyDefinition> {
     use RegistryHive::{CurrentUser as Cu, LocalMachine as Lm};
@@ -363,17 +363,16 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "DisableConsumerAccountStateContent",
             1
         ),
-        PolicyDefinition {
-            id: "settings-home",
-            name: "Settings home page",
-            category: "Personalization",
-            hive: Lm,
-            path: r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
-            value_name: "SettingsPageVisibility",
-            desired: RegistryValue::Text("hide:home"),
-            choices: &[],
-            support: SupportRequirement::windows_build(22_621),
-        },
+        text_policy!(
+            "settings-home",
+            "Settings home page",
+            "Personalization",
+            Lm,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
+            "SettingsPageVisibility",
+            "hide:home"
+        )
+        .with_support(SupportRequirement::windows_build(22_621)),
         policy!(
             "widgets",
             "Widgets",
@@ -425,6 +424,33 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
             "HideSCAMeetNow",
             1
+        ),
+        policy!(
+            "online-tips",
+            "Online tips in Settings",
+            "Personalization",
+            Lm,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
+            "AllowOnlineTips",
+            0
+        ),
+        policy!(
+            "tips-notifications",
+            "Tips and suggestions notifications",
+            "Personalization",
+            Cu,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
+            "SoftLandingEnabled",
+            0
+        ),
+        policy!(
+            "ink-workspace-suggestions",
+            "Suggested apps in Windows Ink Workspace",
+            "Personalization",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\WindowsInkWorkspace",
+            "AllowSuggestedAppsInWindowsInkWorkspace",
+            0
         ),
     ]
 }

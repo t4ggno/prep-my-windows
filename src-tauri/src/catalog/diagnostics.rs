@@ -155,5 +155,68 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             2
         )
         .with_choices(choices::DEFENDER_SAMPLES),
+        policy!(
+            "one-settings-downloads",
+            "OneSettings configuration downloads",
+            "Diagnostics",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
+            "DisableOneSettingsDownloads",
+            1
+        ),
+        policy!(
+            "diagnostic-change-notifications",
+            "Diagnostic data change notifications",
+            "Diagnostics",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
+            "DisableTelemetryOptInChangeNotification",
+            1
+        ),
+        policy!(
+            "error-reporting-additional-data",
+            "Additional error report data",
+            "Diagnostics",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting",
+            "DontSendAdditionalData",
+            1
+        ),
+        policy!(
+            "removal-tool-reports",
+            "Malicious Software Removal Tool reports",
+            "Diagnostics",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\MRT",
+            "DontReportInfectionInformation",
+            1
+        ),
+        policy!(
+            "steps-recorder",
+            "Steps Recorder",
+            "Diagnostics",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppCompat",
+            "DisableUAR",
+            1
+        ),
+        policy!(
+            "disk-health-updates",
+            "Disk health model updates",
+            "Diagnostics",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\StorageHealth",
+            "AllowDiskHealthModelUpdates",
+            0
+        ),
+        policy!(
+            "kms-online-validation",
+            "KMS client online validation",
+            "Diagnostics",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\Software Protection Platform",
+            "NoGenTicket",
+            1
+        ),
     ]
 }

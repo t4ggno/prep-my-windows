@@ -1,5 +1,5 @@
 use super::choices;
-use crate::models::{PolicyDefinition, RegistryHive, RegistryValue, SupportRequirement};
+use crate::models::{PolicyDefinition, RegistryHive};
 
 pub(super) fn policies() -> Vec<PolicyDefinition> {
     use RegistryHive::{CurrentUser as Cu, LocalMachine as Lm};
@@ -122,7 +122,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "App permissions",
             Lm,
             r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
-            "LetAppsAccessDiagnosticInfo",
+            "LetAppsGetDiagnosticInfo",
             2
         )
         .with_choices(choices::APP_ACCESS_DENIED),
@@ -205,39 +205,36 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             2
         )
         .with_choices(choices::APP_ACCESS_DENIED),
-        PolicyDefinition {
-            id: "location-consent",
-            name: "Location capability",
-            category: "Privacy",
-            hive: Lm,
-            path: r"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location",
-            value_name: "Value",
-            desired: RegistryValue::Text("Allow"),
-            choices: choices::CONSENT,
-            support: SupportRequirement::any(),
-        },
-        PolicyDefinition {
-            id: "location-user-consent",
-            name: "App location access",
-            category: "App permissions",
-            hive: Cu,
-            path: r"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location",
-            value_name: "Value",
-            desired: RegistryValue::Text("Allow"),
-            choices: choices::CONSENT,
-            support: SupportRequirement::any(),
-        },
-        PolicyDefinition {
-            id: "location-desktop-consent",
-            name: "Desktop app location access",
-            category: "App permissions",
-            hive: Cu,
-            path: r"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location\NonPackaged",
-            value_name: "Value",
-            desired: RegistryValue::Text("Allow"),
-            choices: choices::CONSENT,
-            support: SupportRequirement::any(),
-        },
+        text_policy!(
+            "location-consent",
+            "Location capability",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location",
+            "Value",
+            "Allow"
+        )
+        .with_choices(choices::CONSENT),
+        text_policy!(
+            "location-user-consent",
+            "App location access",
+            "App permissions",
+            Cu,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location",
+            "Value",
+            "Allow"
+        )
+        .with_choices(choices::CONSENT),
+        text_policy!(
+            "location-desktop-consent",
+            "Desktop app location access",
+            "App permissions",
+            Cu,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location\NonPackaged",
+            "Value",
+            "Allow"
+        )
+        .with_choices(choices::CONSENT),
         policy!(
             "tailored-experiences-setting",
             "Tailored experiences setting",
@@ -283,5 +280,200 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "PreventDeviceMetadataFromNetwork",
             1
         ),
+        policy!(
+            "app-calendar",
+            "App access to calendar",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessCalendar",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-email",
+            "App access to email",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessEmail",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-tasks",
+            "App access to tasks",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessTasks",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-phone-calls",
+            "App access to phone calls",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessPhone",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-radios",
+            "App control of radios",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessRadios",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-notifications",
+            "App access to notifications",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessNotifications",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-unpaired-devices",
+            "App communication with unpaired devices",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsSyncWithDevices",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-voice-activation",
+            "App voice activation",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsActivateWithVoice",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-voice-activation-locked",
+            "App voice activation while locked",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsActivateWithVoiceAboveLock",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-eye-tracking",
+            "App access to eye tracking",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessGazeInput",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED),
+        policy!(
+            "app-camera",
+            "App access to camera",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessCamera",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED)
+        .off_by_default(),
+        policy!(
+            "app-microphone",
+            "App access to microphone",
+            "App permissions",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+            "LetAppsAccessMicrophone",
+            2
+        )
+        .with_choices(choices::APP_ACCESS_DENIED)
+        .off_by_default(),
+        policy!(
+            "website-language-list",
+            "Website access to language list",
+            "Privacy",
+            Cu,
+            r"Control Panel\International\User Profile",
+            "HttpAcceptLanguageOptOut",
+            1
+        ),
+        policy!(
+            "find-my-device",
+            "Find my device",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\FindMyDevice",
+            "AllowFindMyDevice",
+            0
+        ),
+        policy!(
+            "speech-model-updates",
+            "Speech model updates",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Speech",
+            "AllowSpeechModelUpdate",
+            0
+        ),
+        policy!(
+            "online-font-providers",
+            "Online font providers",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\System",
+            "EnableFontProviders",
+            0
+        ),
+        policy!(
+            "online-app-lookup",
+            "Online app lookup for unknown files",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
+            "NoInternetOpenWith",
+            1
+        ),
+        policy!(
+            "media-drm-online",
+            "Windows Media DRM internet access",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\WMDRM",
+            "DisableOnline",
+            1
+        ),
+        policy!(
+            "apps-for-websites",
+            "Apps for websites",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\System",
+            "EnableAppUriHandlers",
+            0
+        ),
+        policy!(
+            "connectivity-probe",
+            "Internet connectivity probe",
+            "Privacy",
+            Lm,
+            r"SOFTWARE\Policies\Microsoft\Windows\NetworkConnectivityStatusIndicator",
+            "NoActiveProbe",
+            1
+        )
+        .off_by_default(),
     ]
 }

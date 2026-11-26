@@ -163,6 +163,16 @@ pub fn scheduled_tasks() -> Vec<ScheduledTaskDefinition> {
             "Click to Do model updates",
             r"\Microsoft\Windows\WindowsAI\ClickToDo\ModelCachingUpdate",
         ),
+        (
+            "one-settings-refresh",
+            "OneSettings refresh",
+            r"\Microsoft\Windows\Flighting\OneSettings\RefreshCache",
+        ),
+        (
+            "speech-model-download",
+            "Speech model download",
+            r"\Microsoft\Windows\Speech\SpeechModelDownloadTask",
+        ),
     ]
     .into_iter()
     .map(|(id, name, path)| ScheduledTaskDefinition { id, name, path })
