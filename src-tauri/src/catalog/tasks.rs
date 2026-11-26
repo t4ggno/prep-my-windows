@@ -154,6 +154,11 @@ pub fn scheduled_tasks() -> Vec<ScheduledTaskDefinition> {
             r"\Microsoft\Windows\WindowsAI\ClickToDo\ModelCachingLimit",
         ),
         (
+            "user-choice-protection-restore",
+            "User Choice Protection restore",
+            r"\Microsoft\Windows\AppxDeploymentClient\UCPD velocity",
+        ),
+        (
             "click-to-do-model-update",
             "Click to Do model updates",
             r"\Microsoft\Windows\WindowsAI\ClickToDo\ModelCachingUpdate",

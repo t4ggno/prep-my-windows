@@ -74,7 +74,16 @@ pub fn enforce_policy(definition: &PolicyDefinition) -> Result<bool, String> {
         RegistryValue::Text(value) => key.set_value(definition.value_name, value),
         RegistryValue::Absent => unreachable!(),
     }
-    .map_err(|error| format!("Could not enforce {}: {error}", definition.name))?;
+    .map_err(|error| {
+        if error.kind() == ErrorKind::PermissionDenied {
+            format!(
+                "Could not enforce {}: Windows blocks changes to this value",
+                definition.name
+            )
+        } else {
+            format!("Could not enforce {}: {error}", definition.name)
+        }
+    })?;
 
     Ok(true)
 }

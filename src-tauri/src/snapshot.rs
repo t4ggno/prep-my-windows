@@ -148,9 +148,11 @@ fn package_views(config: &AppConfig, installed_packages: &[InstalledPackage]) ->
                 .filter(|package| package.name.eq_ignore_ascii_case(definition.pattern));
             let mut installed = false;
             let mut provisioned = false;
+            let mut removable = true;
             for package in matches {
                 installed = true;
                 provisioned |= package.provisioned;
+                removable &= package.removable;
             }
             PackageView {
                 id: definition.id.to_owned(),
@@ -159,6 +161,7 @@ fn package_views(config: &AppConfig, installed_packages: &[InstalledPackage]) ->
                 enabled: config.packages.get(definition.id).copied().unwrap_or(false),
                 installed,
                 provisioned,
+                removable,
             }
         })
         .collect()

@@ -21,6 +21,11 @@ pub(super) const SERVICE_DISABLED: &[PolicyChoice] = &[
     choice("manual", "Manual", RegistryValue::Dword(3)),
 ];
 
+pub(super) const DRIVER_DISABLED: &[PolicyChoice] = &[
+    choice("disabled", "Disabled", RegistryValue::Dword(4)),
+    choice("on", "On", RegistryValue::Dword(1)),
+];
+
 pub(super) const SERVICE_MANUAL: &[PolicyChoice] = &[
     choice("manual", "Manual", RegistryValue::Dword(3)),
     choice("disabled", "Disabled", RegistryValue::Dword(4)),

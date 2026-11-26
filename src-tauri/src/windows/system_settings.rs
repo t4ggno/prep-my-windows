@@ -311,7 +311,7 @@ fn widgets_taskbar_policy() -> PolicyDefinition {
         value_name: "TaskbarDa",
         desired: RegistryValue::Dword(0),
         choices: &[],
-        support: SupportRequirement::windows_build(22_000),
+        support: SupportRequirement::windows_build(22_000).blocked_by_user_choice_protection(),
     }
 }
 

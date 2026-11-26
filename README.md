@@ -12,7 +12,7 @@ The default profile is broad: all built-in rules are selected, including app-rem
 - App removal affects all users on the PC and prevents removed packages from being added for new users. Turning a rule off does not reinstall an app.
 - Process rules force matching programs to close as soon as the app detects them and can discard unsaved work. The notification can allow the stopped app once or disable its rule permanently.
 - Blocking an autostart entry can remove it or disable its service or scheduled task. Removing the rule later does not recreate or re-enable the original entry.
-- The default Windows policy changes system-wide behavior, including whether Windows asks for approval before administrator-level changes, diagnostics, Copilot and other AI features, cloud features, fast startup, game capture, Windows Update restarts, Defender sample submission, software installed by device firmware, several background services, and Edge. Network blocks may also prevent related Microsoft services from connecting.
+- The default Windows policy changes system-wide behavior, including whether Windows asks for approval before administrator-level changes, diagnostics, Copilot and other AI features, cloud features, fast startup, game capture, Windows Update restarts, Defender sample submission, software installed by device firmware, several background services, Windows User Choice Protection (takes effect after a restart), and Edge. Network blocks may also prevent related Microsoft services from connecting.
 
 Turning off a rule stops Prep My Windows from enforcing it again, but it does not necessarily restore the previous Windows setting. Quitting or uninstalling the app also does not undo changes already made.
 

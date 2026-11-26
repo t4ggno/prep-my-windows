@@ -55,6 +55,16 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             1
         ),
         policy!(
+            "user-choice-protection",
+            "User Choice Protection",
+            "Windows behavior",
+            Lm,
+            r"SYSTEM\CurrentControlSet\Services\UCPD",
+            "Start",
+            4
+        )
+        .with_choices(choices::DRIVER_DISABLED),
+        policy!(
             "maps-service",
             "Downloaded maps service",
             "Windows behavior",
@@ -162,7 +172,7 @@ pub fn system_settings() -> Vec<SystemSettingDefinition> {
             category: "Windows behavior",
             scope: "Current user",
             kind: SystemSettingKind::WidgetsTaskbarButton,
-            support: SupportRequirement::windows_build(22_000),
+            support: SupportRequirement::windows_build(22_000).blocked_by_user_choice_protection(),
         },
     ]
 }

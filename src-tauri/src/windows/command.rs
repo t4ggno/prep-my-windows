@@ -74,6 +74,14 @@ pub fn run_hidden(program: &str, args: &[&str], timeout: Duration) -> Result<Out
     })
 }
 
+pub fn powershell_string_array(values: &[impl AsRef<str>]) -> String {
+    values
+        .iter()
+        .map(|value| format!("'{}'", value.as_ref().replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 pub fn run_powershell(script: &str, timeout: Duration) -> Result<String, String> {
     let script = format!("{POWERSHELL_PRELUDE}{script}");
     let output = run_hidden(
@@ -114,7 +122,15 @@ pub fn run_powershell_json<T: serde::de::DeserializeOwned>(
 mod tests {
     use std::time::Duration;
 
-    use super::{DEFAULT_TIMEOUT, run_hidden, run_powershell};
+    use super::{DEFAULT_TIMEOUT, powershell_string_array, run_hidden, run_powershell};
+
+    #[test]
+    fn quotes_powershell_strings() {
+        assert_eq!(
+            powershell_string_array(&["a", "it's"]),
+            "'a','it''s'".to_owned()
+        );
+    }
 
     #[test]
     fn powershell_output_is_utf8() {

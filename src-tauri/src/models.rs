@@ -107,6 +107,7 @@ pub struct SupportRequirement {
     pub minimum_build: u32,
     pub edition: WindowsEditionRequirement,
     pub minimum_edge_major: u32,
+    pub blocked_by_user_choice_protection: bool,
 }
 
 impl SupportRequirement {
@@ -115,6 +116,14 @@ impl SupportRequirement {
             minimum_build: 0,
             edition: WindowsEditionRequirement::Any,
             minimum_edge_major: 0,
+            blocked_by_user_choice_protection: false,
+        }
+    }
+
+    pub const fn blocked_by_user_choice_protection(self) -> Self {
+        Self {
+            blocked_by_user_choice_protection: true,
+            ..self
         }
     }
 
@@ -136,7 +145,7 @@ impl SupportRequirement {
         Self {
             minimum_build,
             edition: WindowsEditionRequirement::Professional,
-            minimum_edge_major: 0,
+            ..Self::any()
         }
     }
 
@@ -164,6 +173,11 @@ impl SupportRequirement {
                 self.minimum_edge_major
             ));
         }
+        if self.blocked_by_user_choice_protection && system.user_choice_protection_active {
+            return Some(
+                "Requires User Choice Protection to be off and Windows to be restarted".to_owned(),
+            );
+        }
         None
     }
 }
@@ -179,6 +193,7 @@ pub struct SystemSupport {
     pub build: u32,
     pub edition_id: String,
     pub edge_major_version: Option<u32>,
+    pub user_choice_protection_active: bool,
 }
 
 impl SystemSupport {
@@ -329,6 +344,7 @@ pub struct PackageView {
     pub enabled: bool,
     pub installed: bool,
     pub provisioned: bool,
+    pub removable: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -507,6 +523,7 @@ mod tests {
             build: 26_200,
             edition_id: "Core".to_owned(),
             edge_major_version: Some(151),
+            user_choice_protection_active: true,
         };
         assert_eq!(
             SupportRequirement::professional(22_621).unavailable_reason(&home),
@@ -515,6 +532,23 @@ mod tests {
         assert_eq!(
             SupportRequirement::windows_build(30_000).unavailable_reason(&home),
             Some("Requires Windows build 30000 or newer".to_owned())
+        );
+        assert_eq!(
+            SupportRequirement::any()
+                .blocked_by_user_choice_protection()
+                .unavailable_reason(&home),
+            Some(
+                "Requires User Choice Protection to be off and Windows to be restarted".to_owned()
+            )
+        );
+        assert_eq!(
+            SupportRequirement::any()
+                .blocked_by_user_choice_protection()
+                .unavailable_reason(&SystemSupport {
+                    user_choice_protection_active: false,
+                    ..home.clone()
+                }),
+            None
         );
 
         let without_edge = SystemSupport {

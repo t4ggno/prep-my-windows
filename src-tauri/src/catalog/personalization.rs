@@ -383,7 +383,9 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "AllowNewsAndInterests",
             0
         )
-        .with_support(SupportRequirement::windows_build(22_000)),
+        .with_support(
+            SupportRequirement::windows_build(22_000).blocked_by_user_choice_protection(),
+        ),
         policy!(
             "news-and-interests",
             "News and interests",
@@ -392,7 +394,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Feeds",
             "EnableFeeds",
             0
-        ),
+        )
+        .with_support(SupportRequirement::any().blocked_by_user_choice_protection()),
         policy!(
             "taskbar-search",
             "Taskbar search",

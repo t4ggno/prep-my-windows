@@ -26,7 +26,11 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use winreg::RegKey;
 use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_64KEY};
 
-pub use command::{DEFAULT_TIMEOUT, run_hidden, run_powershell, run_powershell_json};
+pub use command::{
+    DEFAULT_TIMEOUT, powershell_string_array, run_hidden, run_powershell, run_powershell_json,
+};
+
+const USER_CHOICE_PROTECTION_SERVICE: &str = "UCPD";
 
 use crate::models::{SystemInfo, SystemSupport};
 
@@ -74,6 +78,7 @@ pub fn support_info() -> Result<SystemSupport, String> {
         build,
         edition_id,
         edge_major_version: edge_major_version(),
+        user_choice_protection_active: services::is_running(USER_CHOICE_PROTECTION_SERVICE)?,
     })
 }
 

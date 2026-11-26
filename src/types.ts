@@ -57,6 +57,7 @@ export interface PackageItem {
   enabled: boolean;
   installed: boolean;
   provisioned: boolean;
+  removable: boolean;
 }
 
 export interface InstalledPackage {

@@ -36,14 +36,18 @@ impl EnforcementOutcome {
         self.errors.extend(other.errors);
     }
 
-    fn complete(self, state: &AppState) -> Result<u64, String> {
+    fn complete(self, state: &AppState) -> u64 {
         report_errors(state, &self.errors);
-        state.complete_enforcement(self.repaired, 0, self.errors.last().cloned());
-        if self.errors.is_empty() {
-            Ok(self.repaired)
-        } else {
-            Err(self.errors.join("\n"))
-        }
+        state.complete_enforcement(self.repaired, 0, failure_summary(&self.errors));
+        self.repaired
+    }
+}
+
+fn failure_summary(errors: &[String]) -> Option<String> {
+    match errors {
+        [] => None,
+        [error] => Some(error.clone()),
+        errors => Some(format!("{} changes could not be applied", errors.len())),
     }
 }
 
@@ -184,7 +188,7 @@ fn run_enforcement(
 
 pub fn enforce_runtime(app: &AppHandle, state: &AppState) -> Result<u64, String> {
     run_enforcement(app, state, state.lock_enforcement(), || {
-        enforce_runtime_inner(state).complete(state)
+        Ok(enforce_runtime_inner(state).complete(state))
     })
 }
 
@@ -201,23 +205,21 @@ fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
             Default::default()
         }
     };
-    for definition in task_definitions {
-        if !config
-            .scheduled_tasks
-            .get(definition.id)
-            .copied()
-            .unwrap_or(false)
-        {
-            continue;
-        }
-        if task_states.get(definition.id) != Some(&TaskStatus::Enabled) {
-            continue;
-        }
-        match tasks::disable(definition.path) {
-            Ok(true) => repaired += 1,
-            Ok(false) => {}
-            Err(error) => errors.push(error),
-        }
+    let pending_tasks = task_definitions
+        .into_iter()
+        .filter(|definition| {
+            config
+                .scheduled_tasks
+                .get(definition.id)
+                .copied()
+                .unwrap_or(false)
+                && task_states.get(definition.id) == Some(&TaskStatus::Enabled)
+        })
+        .collect::<Vec<_>>();
+    if !pending_tasks.is_empty() {
+        let disabled = tasks::disable(&pending_tasks);
+        repaired += disabled.disabled;
+        errors.extend(disabled.errors);
     }
 
     let mut package_names = catalog::packages()
@@ -258,7 +260,7 @@ fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
 
 pub fn enforce_slow(app: &AppHandle, state: &AppState) -> Result<u64, String> {
     run_enforcement(app, state, state.lock_enforcement(), || {
-        enforce_slow_inner(state).complete(state)
+        Ok(enforce_slow_inner(state).complete(state))
     })
 }
 
@@ -270,7 +272,7 @@ pub fn enforce_all(app: &AppHandle, state: &AppState) -> Result<u64, String> {
         let mut outcome = enforce_runtime_inner(state);
         let killed = process_enforcement::enforce(app, state);
         outcome.merge(enforce_slow_inner(state));
-        outcome.complete(state).map(|repaired| repaired + killed)
+        Ok(outcome.complete(state) + killed)
     })
 }
 
@@ -325,7 +327,7 @@ pub fn start(app: AppHandle, state: AppState) -> Result<(), String> {
 mod tests {
     use super::{
         EnforcementOutcome, RUNTIME_RECONCILIATION_INTERVAL, SLOW_RECONCILIATION_INTERVAL,
-        disabled_service_name, reapplied_message,
+        disabled_service_name, failure_summary, reapplied_message,
     };
     use crate::catalog;
 
@@ -349,6 +351,19 @@ mod tests {
         assert_eq!(
             reapplied_message(&["A", "B", "C", "D"]),
             "Reapplied 4 settings"
+        );
+    }
+
+    #[test]
+    fn summarizes_enforcement_failures() {
+        assert_eq!(failure_summary(&[]), None);
+        assert_eq!(
+            failure_summary(&["Could not enforce A".to_owned()]),
+            Some("Could not enforce A".to_owned())
+        );
+        assert_eq!(
+            failure_summary(&["A".to_owned(), "B".to_owned(), "C".to_owned()]),
+            Some("3 changes could not be applied".to_owned())
         );
     }
 

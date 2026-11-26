@@ -17,6 +17,7 @@ type AppsTab = "rules" | "installed";
 
 function packageState(item: PackageItem) {
   if (!item.installed) return "Not installed";
+  if (!item.removable) return "Protected";
   return item.provisioned ? "Provisioned" : "Installed";
 }
 

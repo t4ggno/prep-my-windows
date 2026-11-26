@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::models::InstalledPackage;
 
-use super::{DEFAULT_TIMEOUT, run_powershell_json};
+use super::{DEFAULT_TIMEOUT, powershell_string_array, run_powershell_json};
 
 const PACKAGE_REMOVAL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 
@@ -68,14 +68,6 @@ ConvertTo-Json -InputObject @($items) -Compress
         .collect())
 }
 
-fn powershell_array(values: &[String]) -> String {
-    values
-        .iter()
-        .map(|value| format!("'{}'", value.replace('\'', "''")))
-        .collect::<Vec<_>>()
-        .join(",")
-}
-
 pub fn enforce(package_names: &[String]) -> Result<PackageEnforcementResult, String> {
     if package_names.is_empty() {
         return Ok(PackageEnforcementResult {
@@ -84,7 +76,7 @@ pub fn enforce(package_names: &[String]) -> Result<PackageEnforcementResult, Str
         });
     }
 
-    let targets = powershell_array(package_names);
+    let targets = powershell_string_array(package_names);
     let script = format!(
         r#"
 $ErrorActionPreference = 'Stop'
@@ -94,12 +86,17 @@ $errors = [System.Collections.Generic.List[string]]::new()
 $installed = @(Get-AppxPackage -AllUsers)
 $provisioned = @(Get-AppxProvisionedPackage -Online)
 foreach ($target in $targets) {{
-    foreach ($package in @($installed | Where-Object {{ $_.Name -eq $target }})) {{
+    foreach ($package in @($installed | Where-Object {{ $_.Name -eq $target -and -not $_.NonRemovable }})) {{
         try {{
             Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction Stop
             $removed.Add($package.Name)
         }} catch {{
-            $errors.Add("$($package.Name): $($_.Exception.Message)")
+            $message = $_.Exception.Message
+            if (@(Get-AppxPackage -AllUsers -Name $package.Name | Where-Object {{ $_.PackageFullName -eq $package.PackageFullName }}).Count -eq 0) {{
+                $removed.Add($package.Name)
+            }} else {{
+                $errors.Add("$($package.Name): $message")
+            }}
         }}
     }}
     foreach ($package in @($provisioned | Where-Object {{ $_.DisplayName -eq $target }})) {{
@@ -107,7 +104,12 @@ foreach ($target in $targets) {{
             Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -AllUsers -ErrorAction Stop | Out-Null
             $removed.Add($package.DisplayName)
         }} catch {{
-            $errors.Add("$($package.DisplayName): $($_.Exception.Message)")
+            $message = $_.Exception.Message
+            if (@(Get-AppxProvisionedPackage -Online | Where-Object {{ $_.PackageName -eq $package.PackageName }}).Count -eq 0) {{
+                $removed.Add($package.DisplayName)
+            }} else {{
+                $errors.Add("$($package.DisplayName): $message")
+            }}
         }}
     }}
 }}
