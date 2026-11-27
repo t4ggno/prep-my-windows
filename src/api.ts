@@ -35,7 +35,7 @@ export const api = {
     invoke<void>("update_runtime_settings", { settings }),
   setEnforcementEnabled: (enabled: boolean) =>
     invoke<void>("set_enforcement_enabled", { enabled }),
-  enforceNow: () => invoke<number>("enforce_now"),
+  enforceNow: () => invoke<void>("enforce_now"),
   resetProfile: () => invoke<void>("reset_profile"),
   exportProfile: (path: string) => invoke<void>("export_profile", { path }),
   importProfile: (path: string) => invoke<void>("import_profile", { path }),

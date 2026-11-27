@@ -273,10 +273,6 @@ impl AppState {
         self.inner.enforcement.lock()
     }
 
-    pub fn try_lock_enforcement(&self) -> Option<MutexGuard<'_, ()>> {
-        self.inner.enforcement.try_lock()
-    }
-
     pub fn complete_enforcement(&self) {
         self.inner.status.write().last_enforced_at = Some(Utc::now().to_rfc3339());
     }

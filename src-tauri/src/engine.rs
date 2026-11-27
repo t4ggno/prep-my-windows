@@ -317,10 +317,7 @@ pub fn enforce_slow(app: &AppHandle, state: &AppState) -> Result<u64, String> {
 }
 
 pub fn enforce_all(app: &AppHandle, state: &AppState) -> Result<u64, String> {
-    let guard = state
-        .try_lock_enforcement()
-        .ok_or_else(|| "Enforcement is already running".to_owned())?;
-    run_enforcement(app, state, guard, || {
+    run_enforcement(app, state, state.lock_enforcement(), || {
         let mut outcome = enforce_runtime_inner(state);
         let killed = process_enforcement::enforce(app, state);
         outcome.merge(enforce_slow_inner(state));

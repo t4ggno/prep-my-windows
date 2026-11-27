@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use serde::Deserialize;
 use uuid::Uuid;
@@ -7,6 +8,7 @@ use uuid::Uuid;
 use crate::catalog;
 use crate::change_history::ChangeSection;
 use crate::engine;
+use crate::events::publish_live_state;
 use crate::models::{
     AddProcessRuleRequest, AppConfig, AutostartEntry, ProcessInfo, ProcessRule, RuntimeSettings,
     Snapshot, SystemInfo,
@@ -63,6 +65,54 @@ async fn run_blocking<T: Send + 'static>(
         .map_err(|error| format!("{failure}: {error}"))?
 }
 
+const ENFORCEMENT_WAIT: Duration = Duration::from_secs(5);
+
+type Enforcement = fn(&tauri::AppHandle, &AppState) -> Result<u64, String>;
+
+async fn finish_or_continue_in_background(
+    wait: Duration,
+    run: impl FnOnce() -> Result<(), String> + Send + 'static,
+    report_late_error: impl FnOnce(String) + Send + 'static,
+) -> Result<(), String> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    tauri::async_runtime::spawn(async move {
+        let result = tauri::async_runtime::spawn_blocking(run)
+            .await
+            .map_err(|error| format!("Enforcement stopped unexpectedly: {error}"))
+            .and_then(|result| result);
+        if let Err(Err(error)) = sender.send(result) {
+            report_late_error(error);
+        }
+    });
+    match tokio::time::timeout(wait, receiver).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(_)) => Err("Enforcement stopped unexpectedly".to_owned()),
+        Err(_) => Ok(()),
+    }
+}
+
+async fn start_enforcement(
+    app: tauri::AppHandle,
+    state: AppState,
+    enforce: Enforcement,
+) -> Result<(), String> {
+    let task_app = app.clone();
+    let task_state = state.clone();
+    finish_or_continue_in_background(
+        ENFORCEMENT_WAIT,
+        move || enforce(&task_app, &task_state).map(drop),
+        move |error| {
+            state.report_problem(error);
+            publish_live_state(&app, &state);
+        },
+    )
+    .await
+}
+
+fn enforce_processes(app: &tauri::AppHandle, state: &AppState) -> Result<u64, String> {
+    Ok(process_enforcement::enforce(app, state))
+}
+
 fn update_with_startup_task(
     state: &AppState,
     start_with_windows: bool,
@@ -88,15 +138,15 @@ async fn replace_profile(
 ) -> Result<(), String> {
     config.validate()?;
     config.enforcement_enabled = state.config().enforcement_enabled;
+    let task_state = state.clone();
     run_blocking("Could not apply profile", move || {
-        update_with_startup_task(&state, config.start_with_windows, |state| {
+        update_with_startup_task(&task_state, config.start_with_windows, |state| {
             state.replace_config(config)
         })?;
-        state.release_all_changes()?;
-        engine::enforce_all(&app, &state)
+        task_state.release_all_changes()
     })
     .await?;
-    Ok(())
+    start_enforcement(app, state, engine::enforce_all).await
 }
 
 #[tauri::command]
@@ -140,7 +190,7 @@ pub async fn set_catalog_items(
         values.extend(ids.into_iter().map(|id| (id, enabled)));
     })?;
 
-    let enforce: fn(&tauri::AppHandle, &AppState) -> Result<u64, String> = match section {
+    let enforce: Enforcement = match section {
         CatalogSection::Policies if enabled => engine::enforce_runtime,
         CatalogSection::NetworkBlocks => engine::enforce_runtime,
         CatalogSection::Packages | CatalogSection::ScheduledTasks if enabled => {
@@ -148,9 +198,7 @@ pub async fn set_catalog_items(
         }
         _ => return Ok(()),
     };
-    let state = state.inner().clone();
-    run_blocking("Could not apply rule", move || enforce(&app, &state)).await?;
-    Ok(())
+    start_enforcement(app, state.inner().clone(), enforce).await
 }
 
 #[tauri::command]
@@ -176,11 +224,7 @@ pub async fn set_policy_choice(
         config.policies.get(&id).copied().unwrap_or(false)
     })?;
     if enabled {
-        let state = state.inner().clone();
-        run_blocking("Could not apply setting", move || {
-            engine::enforce_runtime(&app, &state)
-        })
-        .await?;
+        start_enforcement(app, state.inner().clone(), engine::enforce_runtime).await?;
     }
     Ok(())
 }
@@ -202,11 +246,7 @@ pub async fn set_process_rule_enabled(
         Ok(())
     })?;
     if enabled {
-        let state = state.inner().clone();
-        run_blocking("Could not apply process rule", move || {
-            Ok(process_enforcement::enforce(&app, &state))
-        })
-        .await?;
+        start_enforcement(app, state.inner().clone(), enforce_processes).await?;
     }
     Ok(())
 }
@@ -270,12 +310,7 @@ pub async fn add_process_rule(
         });
         Ok(())
     })?;
-    let state = state.inner().clone();
-    run_blocking("Could not apply process rule", move || {
-        Ok(process_enforcement::enforce(&app, &state))
-    })
-    .await?;
-    Ok(())
+    start_enforcement(app, state.inner().clone(), enforce_processes).await
 }
 
 #[tauri::command]
@@ -347,12 +382,7 @@ pub async fn add_custom_package(
             config.custom_packages.sort();
         }
     })?;
-    let state = state.inner().clone();
-    run_blocking("Could not remove app", move || {
-        engine::enforce_slow(&app, &state)
-    })
-    .await?;
-    Ok(())
+    start_enforcement(app, state.inner().clone(), engine::enforce_slow).await
 }
 
 #[tauri::command]
@@ -376,18 +406,18 @@ pub async fn update_runtime_settings(
 ) -> Result<(), String> {
     settings.validate()?;
     let state = state.inner().clone();
+    let task_state = state.clone();
     run_blocking("Could not apply settings", move || {
-        update_with_startup_task(&state, settings.start_with_windows, |state| {
+        update_with_startup_task(&task_state, settings.start_with_windows, |state| {
             state.update_config(|config| {
                 config.start_with_windows = settings.start_with_windows;
                 config.active_hours_start = settings.active_hours_start;
                 config.active_hours_end = settings.active_hours_end;
             })
-        })?;
-        engine::enforce_runtime(&app, &state)
+        })
     })
     .await?;
-    Ok(())
+    start_enforcement(app, state, engine::enforce_runtime).await
 }
 
 #[tauri::command]
@@ -410,12 +440,9 @@ pub async fn set_enforcement_enabled(
         },
         true,
     );
-    crate::events::publish_live_state(&app, &state);
+    publish_live_state(&app, &state);
     if enabled {
-        run_blocking("Could not enforce policy", move || {
-            engine::enforce_all(&app, &state)
-        })
-        .await?;
+        start_enforcement(app, state, engine::enforce_all).await?;
     }
     Ok(())
 }
@@ -424,12 +451,8 @@ pub async fn set_enforcement_enabled(
 pub async fn enforce_now(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
-) -> Result<u64, String> {
-    let state = state.inner().clone();
-    run_blocking("Could not enforce policy", move || {
-        engine::enforce_all(&app, &state)
-    })
-    .await
+) -> Result<(), String> {
+    start_enforcement(app, state.inner().clone(), engine::enforce_all).await
 }
 
 #[tauri::command]
@@ -464,5 +487,47 @@ pub async fn import_profile(
 #[tauri::command]
 pub fn clear_activity(app: tauri::AppHandle, state: tauri::State<'_, AppState>) {
     state.clear_activity();
-    crate::events::publish_live_state(&app, &state);
+    publish_live_state(&app, &state);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    use super::finish_or_continue_in_background;
+
+    #[tokio::test]
+    async fn returns_results_that_finish_within_the_wait() {
+        let result = finish_or_continue_in_background(
+            Duration::from_secs(5),
+            || Err("failed".to_owned()),
+            |_| panic!("reported late"),
+        )
+        .await;
+
+        assert_eq!(result, Err("failed".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn keeps_slow_runs_going_and_reports_their_errors_later() {
+        let (late_sender, late_receiver) = mpsc::channel();
+
+        let result = finish_or_continue_in_background(
+            Duration::from_millis(50),
+            || {
+                thread::sleep(Duration::from_millis(300));
+                Err("late failure".to_owned())
+            },
+            move |error| late_sender.send(error).unwrap(),
+        )
+        .await;
+
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            late_receiver.recv_timeout(Duration::from_secs(5)),
+            Ok("late failure".to_owned())
+        );
+    }
 }
