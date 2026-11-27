@@ -37,7 +37,7 @@ fn format_current_value(value: &RegValue<'_>, value_type: &RegistryValue) -> Str
     let decoded = match value_type {
         RegistryValue::Dword(_) => u32::from_reg_value(value).map(|value| value.to_string()),
         RegistryValue::Text(_) => String::from_reg_value(value),
-        RegistryValue::Absent => return "Set".to_owned(),
+        RegistryValue::Absent => return "On".to_owned(),
     };
     decoded.unwrap_or_else(|_| format!("Unexpected {:?} value", value.vtype))
 }
@@ -109,7 +109,7 @@ mod tests {
         assert!(RegistryValue::Dword(1).is_satisfied_by(Some("1")));
         assert!(RegistryValue::Text("Allow").is_satisfied_by(Some("Allow")));
         assert!(RegistryValue::Absent.is_satisfied_by(None));
-        assert!(!RegistryValue::Absent.is_satisfied_by(Some("Set")));
+        assert!(!RegistryValue::Absent.is_satisfied_by(Some("On")));
     }
 
     #[test]

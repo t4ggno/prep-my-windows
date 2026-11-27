@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::models::{
     AppConfig, DEFAULT_ACTIVE_HOURS_END, DEFAULT_ACTIVE_HOURS_START, PolicyDefinition,
+    ScheduledTaskDefinition,
 };
 
 macro_rules! policy {
@@ -68,6 +69,7 @@ mod gaming;
 mod network;
 mod personalization;
 mod privacy;
+mod software;
 mod system;
 mod tasks;
 #[cfg(test)]
@@ -77,8 +79,15 @@ mod usability;
 
 pub use apps::{default_process_rules, packages};
 pub use network::network_blocks;
+pub use software::software;
 pub use system::system_settings;
-pub use tasks::scheduled_tasks;
+
+pub fn scheduled_tasks() -> Vec<ScheduledTaskDefinition> {
+    tasks::windows_tasks()
+        .into_iter()
+        .chain(software().into_iter().flat_map(|item| item.tasks))
+        .collect()
+}
 
 pub fn policies() -> Vec<PolicyDefinition> {
     policies_with_active_hours(DEFAULT_ACTIVE_HOURS_START, DEFAULT_ACTIVE_HOURS_END)
@@ -115,6 +124,10 @@ fn policies_with_active_hours(
         update::policies(active_hours_start, active_hours_end),
         privacy::policies(),
         edge::policies(),
+        software()
+            .into_iter()
+            .flat_map(|item| item.policies)
+            .collect(),
     ]
     .into_iter()
     .flatten()
@@ -145,7 +158,7 @@ impl Default for AppConfig {
                 .collect::<BTreeMap<_, _>>(),
             scheduled_tasks: scheduled_tasks()
                 .into_iter()
-                .map(|item| (item.id.to_owned(), true))
+                .map(|item| (item.id.to_owned(), item.default_enabled))
                 .collect::<BTreeMap<_, _>>(),
             process_rules: default_process_rules(),
             muted_process_notifications: Default::default(),

@@ -4,11 +4,49 @@ use std::thread;
 use crate::catalog;
 use crate::models::{
     AppConfig, InstalledPackage, NetworkView, PackageView, PolicyChoiceView, PolicyView,
-    ScheduledTaskView, Snapshot, SupportRequirement, SystemInfo, SystemSupport, TaskStatus,
-    ValueEditor,
+    ScheduledTaskView, Snapshot, SoftwareView, SupportRequirement, SystemInfo, SystemSupport,
+    TaskStatus, ValueEditor,
 };
 use crate::state::AppState;
-use crate::windows::{self, hosts, packages, registry, services, system_settings, tasks};
+use crate::windows::{self, hosts, packages, registry, services, software, system_settings, tasks};
+
+const NOT_INSTALLED: &str = "Not installed on this PC";
+
+struct SoftwareOwners {
+    views: Vec<SoftwareView>,
+    owners: HashMap<&'static str, (&'static str, bool)>,
+}
+
+impl SoftwareOwners {
+    fn detect() -> Self {
+        let mut views = Vec::new();
+        let mut owners = HashMap::new();
+        for definition in catalog::software() {
+            let installed = software::is_installed(&definition);
+            owners.extend(
+                definition
+                    .item_ids()
+                    .map(|item| (item, (definition.id, installed))),
+            );
+            views.push(SoftwareView {
+                id: definition.id.to_owned(),
+                name: definition.name.to_owned(),
+                installed,
+            });
+        }
+        Self { views, owners }
+    }
+
+    fn owner(&self, item: &str) -> Option<String> {
+        self.owners.get(item).map(|(owner, _)| (*owner).to_owned())
+    }
+
+    fn is_missing(&self, item: &str) -> bool {
+        self.owners
+            .get(item)
+            .is_some_and(|(_, installed)| !installed)
+    }
+}
 
 struct PolicyViews {
     views: Vec<PolicyView>,
@@ -25,7 +63,7 @@ fn unavailable_reason(
     }
 }
 
-fn policy_views(config: &AppConfig) -> PolicyViews {
+fn policy_views(config: &AppConfig, software: &SoftwareOwners) -> PolicyViews {
     let support = windows::support_info();
     let mut problems = Vec::new();
     if let Err(error) = &support {
@@ -67,12 +105,14 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
             registry: Some(definition.registry_location()),
             available: false,
             unavailable_reason: None,
+            software: software.owner(definition.id),
         };
         let reason = unavailable_reason(definition.support, &support).or_else(|| {
-            definition
-                .service_name()
-                .filter(|name| !services::is_installed(name))
-                .map(|_| "Not installed on this PC".to_owned())
+            (software.is_missing(definition.id)
+                || definition
+                    .service_name()
+                    .is_some_and(|name| !services::is_installed(name)))
+            .then(|| NOT_INSTALLED.to_owned())
         });
         if let Some(reason) = reason {
             views.push(PolicyView {
@@ -118,6 +158,7 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
             registry: None,
             available: false,
             unavailable_reason: None,
+            software: None,
         };
         if let Some(reason) = unavailable_reason(definition.support, &support) {
             views.push(PolicyView {
@@ -203,6 +244,7 @@ fn network_views(config: &AppConfig, problems: &mut Vec<String>) -> Vec<NetworkV
 
 fn task_views(
     config: &AppConfig,
+    software: &SoftwareOwners,
     states: Result<HashMap<String, TaskStatus>, String>,
     problems: &mut Vec<String>,
 ) -> Vec<ScheduledTaskView> {
@@ -225,18 +267,20 @@ fn task_views(
                 .get(definition.id)
                 .copied()
                 .unwrap_or(TaskStatus::Unknown),
+            software: software.owner(definition.id),
         })
         .collect()
 }
 
 pub fn build(state: &AppState, system: SystemInfo) -> Snapshot {
     let config = state.config();
-    let (policies, installed_packages, task_states) = thread::scope(|scope| {
+    let ((policies, software), installed_packages, task_states) = thread::scope(|scope| {
         let installed_packages = scope.spawn(packages::list);
         let task_states = scope.spawn(|| tasks::states(&catalog::scheduled_tasks()));
-        let policies = policy_views(&config);
+        let software = SoftwareOwners::detect();
+        let policies = policy_views(&config, &software);
         (
-            policies,
+            (policies, software),
             installed_packages
                 .join()
                 .unwrap_or_else(|_| Err("Could not list installed apps".to_owned())),
@@ -258,7 +302,7 @@ pub fn build(state: &AppState, system: SystemInfo) -> Snapshot {
         }
     };
     let network_blocks = network_views(&config, &mut problems);
-    let scheduled_tasks = task_views(&config, task_states, &mut problems);
+    let scheduled_tasks = task_views(&config, &software, task_states, &mut problems);
     for problem in problems {
         state.report_problem(problem);
     }
@@ -272,6 +316,7 @@ pub fn build(state: &AppState, system: SystemInfo) -> Snapshot {
         installed_packages,
         network_blocks,
         scheduled_tasks,
+        software: software.views,
         activity: state.activity(),
         reapplied: state.reapplied(),
     }

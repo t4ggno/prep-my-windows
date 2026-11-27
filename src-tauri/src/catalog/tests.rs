@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 
 use super::{
-    configured_policies, network_blocks, packages, policies, scheduled_tasks, system_settings,
+    configured_policies, network_blocks, packages, policies, scheduled_tasks, software,
+    system_settings,
 };
 use crate::models::{AppConfig, RegistryValue, ValueEditor};
 
@@ -60,12 +61,20 @@ fn default_profile_follows_catalog_defaults() {
             definition.id
         );
     }
+    let software_items = software()
+        .iter()
+        .flat_map(|item| item.item_ids().collect::<Vec<_>>())
+        .collect::<HashSet<_>>();
+    let windows_policies = policies()
+        .into_iter()
+        .filter(|definition| !software_items.contains(definition.id))
+        .collect::<Vec<_>>();
     assert!(
-        policies()
+        windows_policies
             .iter()
             .filter(|definition| definition.default_enabled)
             .count()
-            > policies().len() * 3 / 4
+            > windows_policies.len() * 3 / 4
     );
     assert!(
         system_settings()
@@ -74,7 +83,14 @@ fn default_profile_follows_catalog_defaults() {
     );
     assert!(config.packages.values().all(|enabled| *enabled));
     assert!(config.network_blocks.values().all(|enabled| *enabled));
-    assert!(config.scheduled_tasks.values().all(|enabled| *enabled));
+    for definition in scheduled_tasks() {
+        assert_eq!(
+            config.scheduled_tasks.get(definition.id),
+            Some(&(definition.default_enabled && !software_items.contains(definition.id))),
+            "{}",
+            definition.id
+        );
+    }
     assert!(config.process_rules.iter().all(|rule| rule.built_in));
     for (id, enabled) in [
         ("built-in-onedrive", true),
@@ -322,4 +338,47 @@ fn configured_policies_use_selected_choices() {
 
     assert_eq!(desired("diagnostic-data"), RegistryValue::Dword(1));
     assert_eq!(desired("location"), RegistryValue::Absent);
+}
+
+#[test]
+fn software_fixes_start_disabled_and_are_listed_once() {
+    let bundles = software();
+    assert!(all_unique(bundles.iter().map(|item| item.id.to_owned())));
+    assert!(all_unique(bundles.iter().flat_map(|item| {
+        item.item_ids().map(str::to_owned).collect::<Vec<_>>()
+    })));
+
+    let config = AppConfig::default();
+    for bundle in &bundles {
+        assert!(!bundle.markers.is_empty(), "{}", bundle.id);
+        assert!(
+            !bundle.policies.is_empty() || !bundle.tasks.is_empty(),
+            "{}",
+            bundle.id
+        );
+        for definition in &bundle.policies {
+            assert!(!definition.default_enabled, "{}", definition.id);
+            assert_eq!(definition.category, bundle.name, "{}", definition.id);
+            assert_eq!(config.policies.get(definition.id), Some(&false));
+        }
+        for task in &bundle.tasks {
+            assert!(!task.default_enabled, "{}", task.id);
+            assert_eq!(config.scheduled_tasks.get(task.id), Some(&false));
+        }
+    }
+
+    let amd = bundles
+        .iter()
+        .find(|item| item.id == "amd-software")
+        .unwrap();
+    let external_events = amd
+        .policies
+        .iter()
+        .find(|item| item.id == "amd-external-events-service")
+        .unwrap();
+    assert_eq!(
+        external_events.service_name(),
+        Some("AMD External Events Utility")
+    );
+    assert_eq!(external_events.desired, RegistryValue::Dword(4));
 }

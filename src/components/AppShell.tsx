@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   Power,
   PowerOff,
+  Puzzle,
   Settings2,
   ShieldCheck,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const navigation: Array<{
 }> = [
   { id: "overview", label: "Overview", icon: Gauge },
   { id: "policy", label: "Windows policy", icon: ShieldCheck },
+  { id: "software", label: "Software", icon: Puzzle },
   { id: "apps", label: "Apps", icon: Boxes },
   { id: "autostart", label: "Autostart", icon: ListRestart },
   { id: "processes", label: "Process rules", icon: Ban },

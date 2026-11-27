@@ -1,6 +1,7 @@
 export type Section =
   | "overview"
   | "policy"
+  | "software"
   | "apps"
   | "autostart"
   | "processes"
@@ -59,6 +60,7 @@ export interface PolicyItem {
   registry: RegistryLocation | null;
   available: boolean;
   unavailableReason: string | null;
+  software: string | null;
 }
 
 export interface PackageItem {
@@ -95,6 +97,13 @@ export interface ScheduledTaskItem {
   path: string;
   enabled: boolean;
   status: TaskStatus;
+  software: string | null;
+}
+
+export interface SoftwareItem {
+  id: string;
+  name: string;
+  installed: boolean;
 }
 
 export interface ProcessRule {
@@ -187,6 +196,7 @@ export interface Snapshot {
   installedPackages: InstalledPackage[];
   networkBlocks: NetworkItem[];
   scheduledTasks: ScheduledTaskItem[];
+  software: SoftwareItem[];
   activity: ActivityEvent[];
   reapplied: ReappliedChange[];
 }

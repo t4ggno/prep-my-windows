@@ -3,18 +3,16 @@ import {
   BulkToggle,
   EmptyState,
   FilterPills,
-  RuleSwitch,
   SearchField,
   SegmentedControl,
-  StateDot,
   ViewHeader,
 } from "@/components/common";
-import { cn, countBy, matchesQuery } from "@/lib/utils";
+import { countBy, matchesQuery } from "@/lib/utils";
 import type { ActiveHours, PolicyItem, ScheduledTaskItem } from "@/types";
+import { PolicyHeader, PolicyRow, TaskRow } from "@/views/policy/PolicyRows";
 import { PolicyValueEditor } from "@/views/policy/PolicyValueEditor";
 import {
   policyIsChanged,
-  policyIsMismatched,
   policyMatches,
   ruleDiffersFromRecommendation,
   type RuleFilter,
@@ -24,9 +22,9 @@ import {
   valueDiffersFromRecommendation,
 } from "@/views/policy/policyFilters";
 import {
-  type InfoTarget,
+  type InfoSelection,
+  resolveInfoTarget,
   SettingInfoDialog,
-  taskStatusLabels,
 } from "@/views/policy/SettingInfoDialog";
 
 const ALL = "All";
@@ -46,8 +44,6 @@ const stateOptions: Array<{ id: StateFilter; label: string }> = [
   { id: "unavailable", label: "Unavailable" },
 ];
 
-type InfoSelection = { kind: InfoTarget["kind"]; id: string };
-
 function policyNote(item: PolicyItem) {
   if (!item.available) return item.unavailableReason ?? "Unavailable";
   if (valueDiffersFromRecommendation(item)) {
@@ -57,39 +53,6 @@ function policyNote(item: PolicyItem) {
     return `${item.category} · ${item.recommendedEnabled ? "Recommended to enforce" : "Optional rule"}`;
   }
   return item.category;
-}
-
-function RowTitle({
-  name,
-  changed,
-  onOpen,
-}: {
-  name: string;
-  changed: boolean;
-  onOpen: () => void;
-}) {
-  return (
-    <>
-      <button className="row-title" onClick={onOpen}>
-        {name}
-      </button>
-      {changed && <span className="changed-mark">Changed</span>}
-    </>
-  );
-}
-
-function resolveInfoTarget(
-  selection: InfoSelection | null,
-  policies: PolicyItem[],
-  tasks: ScheduledTaskItem[],
-): InfoTarget | null {
-  if (!selection) return null;
-  if (selection.kind === "policy") {
-    const item = policies.find((policy) => policy.id === selection.id);
-    return item ? { kind: "policy", item } : null;
-  }
-  const item = tasks.find((task) => task.id === selection.id);
-  return item ? { kind: "task", item } : null;
 }
 
 export function PolicyView({
@@ -186,51 +149,27 @@ export function PolicyView({
 
       {visiblePolicies.length > 0 && (
         <section className="data-panel">
-          <div className="data-header policy-grid">
-            <span>Setting</span>
-            <span>Scope</span>
-            <span>Current</span>
-            <span>Wanted</span>
-            <span />
-          </div>
+          <PolicyHeader />
           {visiblePolicies.map((item) => (
-            <div className={cn("data-row policy-grid", !item.available && "unavailable")} key={item.id}>
-              <div className="min-w-0">
-                <div className="row-primary">
-                  <StateDot active={item.available && (!item.enabled || item.compliant)} />
-                  <RowTitle
-                    name={item.name}
-                    changed={policyIsChanged(item)}
-                    onOpen={() => setInfo({ kind: "policy", id: item.id })}
-                  />
-                </div>
-                <div className="row-secondary truncate pl-3.5">{policyNote(item)}</div>
-              </div>
-              <span className="row-secondary">{item.scope}</span>
-              <code
-                className={cn(
-                  "truncate",
-                  item.enabled && policyIsMismatched(item) && "text-amber-300/80",
-                )}
-              >
-                {item.available ? item.current : "Unavailable"}
-              </code>
-              <PolicyValueEditor
-                item={item}
-                activeHours={activeHours}
-                choicePending={pending.has(`choice:${item.id}`)}
-                activeHoursPending={pending.has("settings")}
-                onChoose={(choice) => onChoosePolicyOption(item.id, choice)}
-                onChangeActiveHours={onChangeActiveHours}
-              />
-              <RuleSwitch
-                checked={item.enabled}
-                pending={pending.has(`policies:${item.id}`)}
-                disabled={!item.available}
-                onCheckedChange={(enabled) => onTogglePolicies([item.id], enabled)}
-                label={`Enforce ${item.name}`}
-              />
-            </div>
+            <PolicyRow
+              key={item.id}
+              item={item}
+              note={policyNote(item)}
+              changed={policyIsChanged(item)}
+              editor={
+                <PolicyValueEditor
+                  item={item}
+                  activeHours={activeHours}
+                  choicePending={pending.has(`choice:${item.id}`)}
+                  activeHoursPending={pending.has("settings")}
+                  onChoose={(choice) => onChoosePolicyOption(item.id, choice)}
+                  onChangeActiveHours={onChangeActiveHours}
+                />
+              }
+              pending={pending}
+              onOpen={() => setInfo({ kind: "policy", id: item.id })}
+              onToggle={(enabled) => onTogglePolicies([item.id], enabled)}
+            />
           ))}
         </section>
       )}
@@ -239,35 +178,14 @@ export function PolicyView({
         <section className="data-panel">
           <div className="section-label">Scheduled tasks</div>
           {visibleTasks.map((task) => (
-            <div className="data-row task-grid" key={task.id}>
-              <div className="min-w-0">
-                <div className="row-primary">
-                  <StateDot
-                    active={!task.enabled || task.status === "disabled" || task.status === "missing"}
-                  />
-                  <RowTitle
-                    name={task.name}
-                    changed={taskIsChanged(task)}
-                    onOpen={() => setInfo({ kind: "task", id: task.id })}
-                  />
-                </div>
-                <div className="row-secondary truncate pl-3.5">{task.path}</div>
-              </div>
-              <span
-                className={cn(
-                  "state-text",
-                  task.status !== "enabled" && task.status !== "unknown" && "active",
-                )}
-              >
-                {taskStatusLabels[task.status]}
-              </span>
-              <RuleSwitch
-                checked={task.enabled}
-                pending={pending.has(`scheduledTasks:${task.id}`)}
-                onCheckedChange={(enabled) => onToggleTasks([task.id], enabled)}
-                label={`Disable ${task.name}`}
-              />
-            </div>
+            <TaskRow
+              key={task.id}
+              task={task}
+              changed={taskIsChanged(task)}
+              pending={pending}
+              onOpen={() => setInfo({ kind: "task", id: task.id })}
+              onToggle={(enabled) => onToggleTasks([task.id], enabled)}
+            />
           ))}
         </section>
       )}

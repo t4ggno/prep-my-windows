@@ -9,6 +9,22 @@ export type InfoTarget =
   | { kind: "policy"; item: PolicyItem }
   | { kind: "task"; item: ScheduledTaskItem };
 
+export type InfoSelection = { kind: InfoTarget["kind"]; id: string };
+
+export function resolveInfoTarget(
+  selection: InfoSelection | null,
+  policies: PolicyItem[],
+  tasks: ScheduledTaskItem[],
+): InfoTarget | null {
+  if (!selection) return null;
+  if (selection.kind === "policy") {
+    const item = policies.find((policy) => policy.id === selection.id);
+    return item ? { kind: "policy", item } : null;
+  }
+  const item = tasks.find((task) => task.id === selection.id);
+  return item ? { kind: "task", item } : null;
+}
+
 export const taskStatusLabels: Record<TaskStatus, string> = {
   enabled: "Enabled",
   disabled: "Disabled",

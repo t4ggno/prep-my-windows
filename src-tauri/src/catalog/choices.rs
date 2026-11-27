@@ -219,3 +219,23 @@ pub(super) const SETTINGS_HOME: &[PolicyChoice] = &[
 
 pub(super) const FULL_CONTEXT_MENU: &[PolicyChoice] =
     &[choice("on", "On", RegistryValue::Text(""))];
+
+pub(super) const OFF_WHEN_TWO: &[PolicyChoice] = &[
+    choice("off", "Off", RegistryValue::Dword(2)),
+    choice("on", "On", RegistryValue::Dword(1)),
+];
+
+pub(super) const OFFICE_DIAGNOSTIC_DATA: &[PolicyChoice] = &[
+    choice("off", "Off", RegistryValue::Dword(3)),
+    choice("required", "Required", RegistryValue::Dword(1)),
+    choice("optional", "Optional", RegistryValue::Dword(2)),
+];
+
+pub(super) const VSCODE_TELEMETRY: &[PolicyChoice] = &[
+    choice("off", "Off", RegistryValue::Text("off")),
+    choice("crash", "Crash reports", RegistryValue::Text("crash")),
+    choice("error", "Errors", RegistryValue::Text("error")),
+    choice("all", "All", RegistryValue::Text("all")),
+];
+
+pub(super) const STARTUP_ENTRY: &[PolicyChoice] = &[choice("off", "Off", RegistryValue::Absent)];

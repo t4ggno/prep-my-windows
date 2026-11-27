@@ -19,6 +19,7 @@ import { OverviewView } from "@/views/OverviewView";
 import { PolicyView } from "@/views/policy/PolicyView";
 import { ProcessesView } from "@/views/ProcessesView";
 import { SettingsView } from "@/views/SettingsView";
+import { SoftwareView } from "@/views/software/SoftwareView";
 import { hourLabel } from "@/lib/activeHours";
 import type {
   ActiveHours,
@@ -327,8 +328,8 @@ export default function App() {
       )}
       {section === "policy" && (
         <PolicyView
-          policies={snapshot.policies}
-          tasks={snapshot.scheduledTasks}
+          policies={snapshot.policies.filter((item) => item.software === null)}
+          tasks={snapshot.scheduledTasks.filter((task) => task.software === null)}
           activeHours={{
             activeHoursStart: snapshot.settings.activeHoursStart,
             activeHoursEnd: snapshot.settings.activeHoursEnd,
@@ -338,6 +339,17 @@ export default function App() {
           onToggleTasks={(ids, enabled) => toggleCatalog("scheduledTasks", ids, enabled)}
           onChoosePolicyOption={choosePolicyOption}
           onChangeActiveHours={changeActiveHours}
+        />
+      )}
+      {section === "software" && (
+        <SoftwareView
+          software={snapshot.software}
+          policies={snapshot.policies.filter((item) => item.software !== null)}
+          tasks={snapshot.scheduledTasks.filter((task) => task.software !== null)}
+          pending={pending}
+          onTogglePolicies={(ids, enabled) => toggleCatalog("policies", ids, enabled)}
+          onToggleTasks={(ids, enabled) => toggleCatalog("scheduledTasks", ids, enabled)}
+          onChoosePolicyOption={choosePolicyOption}
         />
       )}
       {section === "apps" && (

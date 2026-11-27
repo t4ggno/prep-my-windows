@@ -13,7 +13,11 @@ import { StateDot, ViewHeader } from "@/components/common";
 import { useNow } from "@/hooks/useNow";
 import { engineState, engineStateLabels } from "@/lib/engineState";
 import { cn, formatRelative, formatTimestamp } from "@/lib/utils";
-import type { Section, Snapshot } from "@/types";
+import type { ScheduledTaskItem, Section, Snapshot } from "@/types";
+
+function taskIsDisabled(task: ScheduledTaskItem) {
+  return task.status === "disabled" || task.status === "missing";
+}
 
 function Metric({
   label,
@@ -88,10 +92,20 @@ export function OverviewView({
   const enabledProcesses = snapshot.settings.processRules.filter((item) => item.enabled).length;
   const enabledNetwork = snapshot.networkBlocks.filter((item) => item.enabled);
   const blockedNetwork = enabledNetwork.filter((item) => item.blocked).length;
-  const enabledTasks = snapshot.scheduledTasks.filter((item) => item.enabled);
-  const disabledTasks = enabledTasks.filter(
-    (item) => item.status === "disabled" || item.status === "missing",
-  ).length;
+  const enabledWindowsPolicies = enabledPolicies.filter((item) => item.software === null);
+  const compliantWindowsPolicies = enabledWindowsPolicies.filter((item) => item.compliant).length;
+  const enabledTasks = snapshot.scheduledTasks.filter(
+    (item) => item.enabled && item.software === null,
+  );
+  const disabledTasks = enabledTasks.filter(taskIsDisabled).length;
+  const enabledSoftwarePolicies = enabledPolicies.filter((item) => item.software !== null);
+  const enabledSoftwareTasks = snapshot.scheduledTasks.filter(
+    (item) => item.enabled && item.software !== null,
+  );
+  const enabledSoftwareFixes = enabledSoftwarePolicies.length + enabledSoftwareTasks.length;
+  const appliedSoftwareFixes =
+    enabledSoftwarePolicies.filter((item) => item.compliant).length +
+    enabledSoftwareTasks.filter(taskIsDisabled).length;
 
   return (
     <div className="view-stack">
@@ -145,9 +159,15 @@ export function OverviewView({
           <div className="summary-list">
             <SummaryRow
               label="Windows policy"
-              value={`${compliantPolicies}/${enabledPolicies.length}`}
-              complete={compliantPolicies === enabledPolicies.length}
+              value={`${compliantWindowsPolicies}/${enabledWindowsPolicies.length}`}
+              complete={compliantWindowsPolicies === enabledWindowsPolicies.length}
               onClick={() => onNavigate("policy")}
+            />
+            <SummaryRow
+              label="Software fixes"
+              value={`${appliedSoftwareFixes}/${enabledSoftwareFixes}`}
+              complete={appliedSoftwareFixes === enabledSoftwareFixes}
+              onClick={() => onNavigate("software")}
             />
             <SummaryRow
               label="App removal"

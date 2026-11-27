@@ -12,7 +12,8 @@ use crate::models::{
 use crate::process_enforcement;
 use crate::state::AppState;
 use crate::windows::{
-    self, autostart, hosts, packages, registry, services, startup_task, system_settings, tasks,
+    self, autostart, hosts, packages, registry, services, software, startup_task, system_settings,
+    tasks,
 };
 
 const RUNTIME_RECONCILIATION_INTERVAL: Duration = Duration::from_secs(60 * 60);
@@ -84,9 +85,12 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
     if let Err(error) = &support {
         errors.push(error.clone());
     }
+    let uninstalled = software::uninstalled_items(&catalog::software());
 
     for definition in catalog::configured_policies(&config) {
-        if !config.policies.get(definition.id).copied().unwrap_or(false) {
+        if !config.policies.get(definition.id).copied().unwrap_or(false)
+            || uninstalled.contains(definition.id)
+        {
             continue;
         }
         if !is_supported(definition.support, &support)

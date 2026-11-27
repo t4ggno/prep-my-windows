@@ -1,6 +1,6 @@
 use crate::models::ScheduledTaskDefinition;
 
-pub fn scheduled_tasks() -> Vec<ScheduledTaskDefinition> {
+pub(super) fn windows_tasks() -> Vec<ScheduledTaskDefinition> {
     [
         (
             "compatibility-appraiser",
@@ -175,6 +175,11 @@ pub fn scheduled_tasks() -> Vec<ScheduledTaskDefinition> {
         ),
     ]
     .into_iter()
-    .map(|(id, name, path)| ScheduledTaskDefinition { id, name, path })
+    .map(|(id, name, path)| ScheduledTaskDefinition {
+        id,
+        name,
+        path,
+        default_enabled: true,
+    })
     .collect()
 }

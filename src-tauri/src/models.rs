@@ -342,6 +342,34 @@ pub struct ScheduledTaskDefinition {
     pub id: &'static str,
     pub name: &'static str,
     pub path: &'static str,
+    pub default_enabled: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum SoftwareMarker {
+    Service(&'static str),
+    File {
+        root: &'static str,
+        path: &'static str,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub struct SoftwareDefinition {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub markers: &'static [SoftwareMarker],
+    pub policies: Vec<PolicyDefinition>,
+    pub tasks: Vec<ScheduledTaskDefinition>,
+}
+
+impl SoftwareDefinition {
+    pub fn item_ids(&self) -> impl Iterator<Item = &'static str> + '_ {
+        self.policies
+            .iter()
+            .map(|policy| policy.id)
+            .chain(self.tasks.iter().map(|task| task.id))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -436,6 +464,7 @@ pub struct PolicyView {
     pub registry: Option<RegistryLocation>,
     pub available: bool,
     pub unavailable_reason: Option<String>,
+    pub software: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -478,6 +507,15 @@ pub struct ScheduledTaskView {
     pub path: String,
     pub enabled: bool,
     pub status: TaskStatus,
+    pub software: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SoftwareView {
+    pub id: String,
+    pub name: String,
+    pub installed: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
@@ -550,6 +588,7 @@ pub struct Snapshot {
     pub installed_packages: Vec<InstalledPackage>,
     pub network_blocks: Vec<NetworkView>,
     pub scheduled_tasks: Vec<ScheduledTaskView>,
+    pub software: Vec<SoftwareView>,
     pub activity: Vec<ActivityEvent>,
     pub reapplied: Vec<ReappliedChange>,
 }

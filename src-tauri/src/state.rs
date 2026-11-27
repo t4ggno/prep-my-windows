@@ -54,7 +54,7 @@ fn normalize_catalog_selections(config: &mut AppConfig) {
         &mut config.scheduled_tasks,
         catalog::scheduled_tasks()
             .into_iter()
-            .map(|item| (item.id, true)),
+            .map(|item| (item.id, item.default_enabled)),
     );
 
     sync_built_in_process_rules(&mut config.process_rules);
@@ -403,6 +403,8 @@ mod tests {
         config.packages.insert("clipchamp".to_owned(), false);
         config.scheduled_tasks.remove("device-census");
         config.network_blocks.remove("events");
+        config.policies.remove("amd-external-events-service");
+        config.scheduled_tasks.remove("amd-software-startup");
 
         normalize_catalog_selections(&mut config);
 
@@ -416,6 +418,14 @@ mod tests {
         assert_eq!(config.packages.get("candy-crush"), Some(&true));
         assert_eq!(config.packages.get("clipchamp"), Some(&false));
         assert_eq!(config.scheduled_tasks.get("device-census"), Some(&true));
+        assert_eq!(
+            config.policies.get("amd-external-events-service"),
+            Some(&false)
+        );
+        assert_eq!(
+            config.scheduled_tasks.get("amd-software-startup"),
+            Some(&false)
+        );
         assert_eq!(config.network_blocks.get("events"), Some(&true));
     }
 

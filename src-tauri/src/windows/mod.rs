@@ -6,6 +6,7 @@ pub mod packages;
 pub mod processes;
 pub mod registry;
 pub mod services;
+pub mod software;
 pub mod startup_task;
 pub mod system_settings;
 pub mod tasks;
