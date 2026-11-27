@@ -630,6 +630,372 @@
     font-weight: 500;
   }
 
+  .row-title {
+    min-width: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: underline transparent;
+    text-underline-offset: 3px;
+    transition: color 120ms ease, text-decoration-color 120ms ease;
+  }
+
+  .row-title:hover,
+  .row-title:focus-visible {
+    color: #f0f9ff;
+    text-decoration-color: rgba(125, 211, 252, 0.5);
+    outline: none;
+  }
+
+  .changed-mark {
+    flex: none;
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 5px;
+    background: rgba(14, 165, 233, 0.08);
+    padding: 1px 5px;
+    color: #7dd3fc;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  .policy-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .policy-toolbar > :last-child {
+    margin-left: auto;
+  }
+
+  .hour-picker-trigger {
+    display: inline-flex;
+    width: 100%;
+    height: 36px;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    padding: 0 9px;
+    color: #f4f4f5;
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+  }
+
+  .hour-picker-trigger:hover:not(:disabled),
+  .hour-picker-trigger[data-state="open"] {
+    border-color: rgba(56, 189, 248, 0.45);
+  }
+
+  .hour-picker-trigger:focus-visible {
+    border-color: rgba(56, 189, 248, 0.6);
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.1);
+  }
+
+  .hour-picker-trigger:disabled {
+    opacity: 0.55;
+  }
+
+  .hour-picker {
+    z-index: 60;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: #131418;
+    padding: 8px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  }
+
+  .hour-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 52px);
+    gap: 3px;
+  }
+
+  .hour-picker-grid button {
+    height: 30px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: #a1a1aa;
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hour-picker-grid button.in-range {
+    background: rgba(14, 165, 233, 0.09);
+    color: #bae6fd;
+  }
+
+  .hour-picker-grid button:hover:not(:disabled) {
+    border-color: rgba(56, 189, 248, 0.35);
+    color: #f0f9ff;
+  }
+
+  .hour-picker-grid button.selected {
+    border-color: rgba(56, 189, 248, 0.6);
+    background: rgba(14, 165, 233, 0.28);
+    color: #f0f9ff;
+  }
+
+  .hour-picker-grid button:disabled {
+    color: #3f3f46;
+    background: transparent;
+  }
+
+  .info-dialog {
+    width: min(760px, calc(100vw - 32px));
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .info-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background:
+      linear-gradient(120deg, rgba(14, 165, 233, 0.1), transparent 55%),
+      rgba(255, 255, 255, 0.015);
+    padding: 20px 56px 18px 24px;
+  }
+
+  .info-eyebrow {
+    margin-bottom: 5px;
+    color: #7dd3fc;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .info-body {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 20px;
+    overflow: auto;
+    padding: 20px 24px 24px;
+  }
+
+  .info-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+    margin: 0;
+  }
+
+  .info-fact {
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    padding: 9px 12px;
+  }
+
+  .info-fact dt {
+    color: #71717a;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .info-fact dd {
+    margin: 3px 0 0;
+    color: #f4f4f5;
+    font-size: 13px;
+    font-weight: 560;
+  }
+
+  .info-fact.warning {
+    border-color: rgba(252, 211, 77, 0.2);
+    background: rgba(252, 211, 77, 0.05);
+  }
+
+  .info-fact.warning dd {
+    color: #fcd34d;
+  }
+
+  .info-fact.accent {
+    border-color: rgba(56, 189, 248, 0.22);
+    background: rgba(14, 165, 233, 0.06);
+  }
+
+  .info-fact.accent dd {
+    color: #7dd3fc;
+  }
+
+  .info-location {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 4px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 14px;
+    color: #52525b;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .info-location code {
+    grid-column: 2;
+    overflow-wrap: anywhere;
+    color: #a1a1aa;
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    user-select: text;
+  }
+
+  .info-location code:first-of-type {
+    grid-row: 1;
+  }
+
+  .markdown-body {
+    color: #c4c4cc;
+    font-size: 13px;
+    line-height: 1.65;
+    user-select: text;
+  }
+
+  .markdown-body > :first-child {
+    margin-top: 0;
+  }
+
+  .markdown-body > :last-child {
+    margin-bottom: 0;
+  }
+
+  .markdown-body p {
+    margin: 0 0 12px;
+  }
+
+  .markdown-body > p:first-child {
+    color: #e4e4e7;
+    font-size: 14px;
+  }
+
+  .markdown-body h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 22px 0 9px;
+    color: #fafafa;
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+
+  .markdown-body h3::before {
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
+    background: linear-gradient(#38bdf8, #0ea5e9);
+    content: "";
+  }
+
+  .markdown-body strong {
+    color: #f4f4f5;
+    font-weight: 620;
+  }
+
+  .markdown-body ul {
+    margin: 0 0 12px;
+    padding-left: 4px;
+    list-style: none;
+  }
+
+  .markdown-body ul > li {
+    position: relative;
+    padding-left: 16px;
+  }
+
+  .markdown-body ul > li::before {
+    position: absolute;
+    top: 0.62em;
+    left: 2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #38bdf8;
+    content: "";
+  }
+
+  .markdown-body li + li {
+    margin-top: 4px;
+  }
+
+  .markdown-body code {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 5px;
+    color: #e0f2fe;
+    font-family: "Cascadia Mono", "Consolas", monospace;
+    font-size: 11px;
+  }
+
+  .markdown-body table {
+    width: 100%;
+    margin: 4px 0 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+  }
+
+  .markdown-body th {
+    background: rgba(255, 255, 255, 0.035);
+    padding: 8px 12px;
+    color: #71717a;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.05em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .markdown-body td {
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+    padding: 9px 12px;
+    vertical-align: top;
+  }
+
+  .markdown-body td:first-child {
+    white-space: nowrap;
+  }
+
+  .markdown-body blockquote {
+    margin: 0 0 12px;
+    border: 1px solid rgba(252, 211, 77, 0.16);
+    border-left: 3px solid rgba(252, 211, 77, 0.6);
+    border-radius: 8px;
+    background: rgba(252, 211, 77, 0.045);
+    padding: 9px 13px;
+    color: #e7dcb8;
+  }
+
+  .markdown-body blockquote p {
+    margin: 0;
+  }
+
+  .markdown-body blockquote strong {
+    color: #fcd34d;
+  }
+
   .row-secondary {
     margin-top: 3px;
     color: #5f5f68;
@@ -737,15 +1103,6 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.045);
     color: #d4d4d8;
     font-size: 12px;
-  }
-
-  .field-error {
-    margin-top: -1px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-    padding: 8px 0 10px;
-    color: #fca5a5;
-    font-size: 11px;
-    text-align: right;
   }
 
   .settings-actions,

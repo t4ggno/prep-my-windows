@@ -29,6 +29,13 @@ impl RegistryHive {
             Self::LocalMachine => "All users",
         }
     }
+
+    pub fn root_name(self) -> &'static str {
+        match self {
+            Self::CurrentUser => "HKCU",
+            Self::LocalMachine => "HKLM",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -57,6 +64,14 @@ impl RegistryValue {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ValueEditor {
+    Choice,
+    ActiveHoursStart,
+    ActiveHoursEnd,
+}
+
 #[derive(Clone, Debug)]
 pub struct PolicyChoice {
     pub id: &'static str,
@@ -74,6 +89,7 @@ pub struct PolicyDefinition {
     pub value_name: &'static str,
     pub desired: RegistryValue,
     pub choices: &'static [PolicyChoice],
+    pub editor: ValueEditor,
     pub support: SupportRequirement,
     pub default_enabled: bool,
 }
@@ -105,19 +121,32 @@ impl PolicyDefinition {
         self
     }
 
+    pub fn with_editor(mut self, editor: ValueEditor) -> Self {
+        self.editor = editor;
+        self
+    }
+
     pub fn choice(&self, id: &str) -> Option<&'static PolicyChoice> {
         self.choices.iter().find(|choice| choice.id == id)
     }
 
     pub fn selected_choice(&self) -> Option<&'static PolicyChoice> {
-        self.choices
-            .iter()
-            .find(|choice| choice.value == self.desired)
+        self.choice_for(&self.desired)
+    }
+
+    fn choice_for(&self, value: &RegistryValue) -> Option<&'static PolicyChoice> {
+        self.choices.iter().find(|choice| choice.value == *value)
+    }
+
+    pub fn label_for(&self, value: &RegistryValue) -> String {
+        self.choice_for(value).map_or_else(
+            || self.format_raw(&value.label()),
+            |choice| choice.label.to_owned(),
+        )
     }
 
     pub fn wanted_label(&self) -> String {
-        self.selected_choice()
-            .map_or_else(|| self.desired.label(), |choice| choice.label.to_owned())
+        self.label_for(&self.desired)
     }
 
     pub fn value_label(&self, current: Option<&str>) -> String {
@@ -125,9 +154,36 @@ impl PolicyDefinition {
             .iter()
             .find(|choice| choice.value.is_satisfied_by(current))
             .map_or_else(
-                || current.unwrap_or("Not set").to_owned(),
+                || current.map_or_else(|| "Not set".to_owned(), |raw| self.format_raw(raw)),
                 |choice| choice.label.to_owned(),
             )
+    }
+
+    pub fn value_type(&self) -> &RegistryValue {
+        std::iter::once(&self.desired)
+            .chain(self.choices.iter().map(|choice| &choice.value))
+            .find(|value| **value != RegistryValue::Absent)
+            .unwrap_or(&RegistryValue::Absent)
+    }
+
+    pub fn registry_location(&self) -> RegistryLocation {
+        RegistryLocation {
+            key: format!(r"{}\{}", self.hive.root_name(), self.path),
+            value: if self.value_name.is_empty() {
+                "(Default)".to_owned()
+            } else {
+                self.value_name.to_owned()
+            },
+        }
+    }
+
+    fn format_raw(&self, raw: &str) -> String {
+        match self.editor {
+            ValueEditor::Choice => raw.to_owned(),
+            ValueEditor::ActiveHoursStart | ValueEditor::ActiveHoursEnd => raw
+                .parse::<u8>()
+                .map_or_else(|_| raw.to_owned(), |hour| format!("{hour:02}:00")),
+        }
     }
 }
 
@@ -351,6 +407,14 @@ impl AppConfig {
 pub struct PolicyChoiceView {
     pub id: String,
     pub label: String,
+    pub value: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryLocation {
+    pub key: String,
+    pub value: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -366,6 +430,10 @@ pub struct PolicyView {
     pub wanted: String,
     pub choices: Vec<PolicyChoiceView>,
     pub choice: Option<String>,
+    pub editor: ValueEditor,
+    pub recommended: String,
+    pub recommended_enabled: bool,
+    pub registry: Option<RegistryLocation>,
     pub available: bool,
     pub unavailable_reason: Option<String>,
 }

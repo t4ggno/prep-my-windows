@@ -32,6 +32,14 @@ export interface SystemInfo {
 export interface PolicyChoice {
   id: string;
   label: string;
+  value: string;
+}
+
+export type ValueEditor = "choice" | "activeHoursStart" | "activeHoursEnd";
+
+export interface RegistryLocation {
+  key: string;
+  value: string;
 }
 
 export interface PolicyItem {
@@ -45,6 +53,10 @@ export interface PolicyItem {
   wanted: string;
   choices: PolicyChoice[];
   choice: string | null;
+  editor: ValueEditor;
+  recommended: string;
+  recommendedEnabled: boolean;
+  registry: RegistryLocation | null;
   available: boolean;
   unavailableReason: string | null;
 }
@@ -184,8 +196,11 @@ export interface LiveState {
   activity: ActivityEvent[];
 }
 
-export interface RuntimeSettings {
-  startWithWindows: boolean;
+export interface ActiveHours {
   activeHoursStart: number;
   activeHoursEnd: number;
+}
+
+export interface RuntimeSettings extends ActiveHours {
+  startWithWindows: boolean;
 }

@@ -19,6 +19,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "",
             ""
         )
+        .with_choices(choices::FULL_CONTEXT_MENU)
         .with_support(SupportRequirement::windows_build(22_000)),
         policy!(
             "startup-app-delay",
@@ -28,7 +29,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             EXPLORER_STARTUP,
             "StartupDelayInMSec",
             0
-        ),
+        )
+        .with_choices(choices::STARTUP_DELAY),
         policy!(
             "startup-app-idle-wait",
             "Startup apps wait for idle",
@@ -37,7 +39,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             EXPLORER_STARTUP,
             "WaitForIdleState",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "autoplay",
             "AutoPlay",
@@ -46,7 +49,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers",
             "DisableAutoplay",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "managed-default-printer",
             "Windows-managed default printer",
@@ -55,7 +59,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows",
             "LegacyDefaultPrinterMode",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "explorer-cloud-files",
             "Cloud files in File Explorer Home",
@@ -64,7 +69,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             EXPLORER,
             "ShowCloudFilesInQuickAccess",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "explorer-recent-files",
             "Recent files in File Explorer",
@@ -74,6 +80,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "ShowRecent",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .off_by_default(),
         policy!(
             "explorer-frequent-folders",
@@ -84,6 +91,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "ShowFrequent",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .off_by_default(),
         policy!(
             "explorer-start-page",
@@ -116,6 +124,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "ShowTaskViewButton",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .off_by_default(),
         policy!(
             "taskbar-alignment",
@@ -138,6 +147,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "SnapAssist",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .off_by_default(),
         policy!(
             "taskbar-last-active-click",
@@ -148,6 +158,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "LastActiveClick",
             1
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .off_by_default(),
         policy!(
             "verbose-status",
@@ -158,6 +169,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "VerboseStatus",
             1
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .off_by_default(),
     ]
 }

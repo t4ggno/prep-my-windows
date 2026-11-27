@@ -13,6 +13,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge first-run experience",
             "HideFirstRunExperience",
             1,
+            choices::OFF_WHEN_ONE,
             80,
         ),
         (
@@ -20,6 +21,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge default-browser campaign",
             "DefaultBrowserSettingsCampaignEnabled",
             0,
+            choices::ON_WHEN_ONE,
             113,
         ),
         (
@@ -27,6 +29,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge PDF-handler recommendations",
             "ShowPDFDefaultRecommendationsEnabled",
             0,
+            choices::ON_WHEN_ONE,
             93,
         ),
         (
@@ -34,6 +37,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge personalization reporting",
             "PersonalizationReportingEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -41,6 +45,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge search result telemetry",
             "Edge3PSerpTelemetryEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -48,6 +53,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge feedback",
             "UserFeedbackAllowed",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -55,6 +61,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge search suggestions",
             "SearchSuggestEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -62,6 +69,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge web error service",
             "AlternateErrorPagesEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -69,15 +77,31 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge navigation error service",
             "ResolveNavigationErrorsUseWebService",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
-        ("edge-sync", "Edge sync", "SyncDisabled", 1, 0),
-        ("edge-signin", "Edge browser sign-in", "BrowserSignin", 0, 0),
+        (
+            "edge-sync",
+            "Edge sync",
+            "SyncDisabled",
+            1,
+            choices::OFF_WHEN_ONE,
+            0,
+        ),
+        (
+            "edge-signin",
+            "Edge browser sign-in",
+            "BrowserSignin",
+            0,
+            choices::EDGE_SIGNIN,
+            0,
+        ),
         (
             "edge-shopping",
             "Edge shopping assistant",
             "EdgeShoppingAssistantEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -85,6 +109,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge recommendations",
             "ShowRecommendationsEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -92,6 +117,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge spotlight experiences",
             "SpotlightExperiencesAndRecommendationsEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -99,14 +125,23 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge promotional tabs",
             "PromotionalTabsEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
-        ("edge-sidebar", "Edge sidebar", "HubsSidebarEnabled", 0, 0),
+        (
+            "edge-sidebar",
+            "Edge sidebar",
+            "HubsSidebarEnabled",
+            0,
+            choices::ON_WHEN_ONE,
+            0,
+        ),
         (
             "edge-startup-boost",
             "Edge startup boost",
             "StartupBoostEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -114,6 +149,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge background mode",
             "BackgroundModeEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -121,6 +157,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge new tab content",
             "NewTabPageContentEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -128,6 +165,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge Insider promotion",
             "MicrosoftEdgeInsiderPromotionEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -135,6 +173,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge Copilot page context",
             "CopilotPageContext",
             0,
+            choices::ON_WHEN_ONE,
             124,
         ),
         (
@@ -142,6 +181,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge asset delivery",
             "EdgeAssetDeliveryServiceEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -149,6 +189,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge work Copilot page context",
             "EdgeEntraCopilotPageContext",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -156,6 +197,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge Copilot toolbar icon",
             "Microsoft365CopilotChatIconEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -163,6 +205,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge new tab Copilot",
             "NewTabPageBingChatEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -170,6 +213,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge AI history search",
             "EdgeHistoryAISearchEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -177,6 +221,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge writing assistance",
             "ComposeInlineEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -184,6 +229,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge local AI model",
             "GenAILocalFoundationalModelSettings",
             1,
+            choices::OFF_WHEN_ONE,
             0,
         ),
         (
@@ -191,6 +237,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge sponsored top sites",
             "NewTabPageHideDefaultTopSites",
             1,
+            choices::OFF_WHEN_ONE,
             0,
         ),
         (
@@ -198,6 +245,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge tab services",
             "TabServicesEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -205,6 +253,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge Microsoft Rewards",
             "ShowMicrosoftRewards",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -212,6 +261,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge wallet donations",
             "WalletDonationEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -219,6 +269,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge Acrobat subscription button",
             "ShowAcrobatSubscriptionButton",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -226,6 +277,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge default browser check",
             "DefaultBrowserSettingEnabled",
             0,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -233,6 +285,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge Do Not Track",
             "ConfigureDoNotTrack",
             1,
+            choices::ON_WHEN_ONE,
             0,
         ),
         (
@@ -240,6 +293,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge search bar on desktop",
             "SearchbarAllowed",
             0,
+            choices::ON_WHEN_ONE,
             117,
         ),
         (
@@ -247,14 +301,23 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge automatic data import",
             "AutoImportAtFirstRun",
             4,
+            choices::EDGE_FIRST_RUN_IMPORT,
             77,
         ),
-        ("edge-drop", "Edge Drop", "EdgeEDropEnabled", 0, 104),
+        (
+            "edge-drop",
+            "Edge Drop",
+            "EdgeEDropEnabled",
+            0,
+            choices::ON_WHEN_ONE,
+            104,
+        ),
         (
             "edge-editor-proofing",
             "Edge Microsoft Editor proofing",
             "MicrosoftEditorProofingEnabled",
             0,
+            choices::ON_WHEN_ONE,
             105,
         ),
         (
@@ -262,6 +325,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge Microsoft Editor synonyms",
             "MicrosoftEditorSynonymsEnabled",
             0,
+            choices::ON_WHEN_ONE,
             105,
         ),
         (
@@ -269,6 +333,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge text prediction",
             "TextPredictionEnabled",
             0,
+            choices::ON_WHEN_ONE,
             104,
         ),
         (
@@ -276,6 +341,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge saved payment method check",
             "PaymentMethodQueryEnabled",
             0,
+            choices::ON_WHEN_ONE,
             80,
         ),
         (
@@ -283,6 +349,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge visual search",
             "VisualSearchEnabled",
             0,
+            choices::ON_WHEN_ONE,
             95,
         ),
         (
@@ -290,6 +357,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge AI-generated themes",
             "AIGenThemesEnabled",
             0,
+            choices::ON_WHEN_ONE,
             122,
         ),
         (
@@ -297,6 +365,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge new tab app launcher",
             "NewTabPageAppLauncherEnabled",
             0,
+            choices::ON_WHEN_ONE,
             108,
         ),
         (
@@ -304,6 +373,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge browser essentials button",
             "PinBrowserEssentialsToolbarButton",
             0,
+            choices::ON_WHEN_ONE,
             114,
         ),
         (
@@ -311,6 +381,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge sidebar on desktop",
             "StandaloneHubsSidebarEnabled",
             0,
+            choices::ON_WHEN_ONE,
             114,
         ),
         (
@@ -318,14 +389,18 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Edge trending search suggestions",
             "AddressBarTrendingSuggestEnabled",
             0,
+            choices::ON_WHEN_ONE,
             135,
         ),
     ]
     .into_iter()
-    .map(|(id, name, value_name, value, minimum_edge_major)| {
-        policy!(id, name, CATEGORY, Lm, EDGE_POLICIES, value_name, value)
-            .with_support(SupportRequirement::edge(minimum_edge_major))
-    })
+    .map(
+        |(id, name, value_name, value, choices, minimum_edge_major)| {
+            policy!(id, name, CATEGORY, Lm, EDGE_POLICIES, value_name, value)
+                .with_choices(choices)
+                .with_support(SupportRequirement::edge(minimum_edge_major))
+        },
+    )
     .chain([
         policy!(
             "edge-network-prediction",
@@ -376,7 +451,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\EdgeUpdate",
             "CreateDesktopShortcutDefault",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
     ])
     .collect()
 }

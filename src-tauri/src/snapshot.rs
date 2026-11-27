@@ -5,6 +5,7 @@ use crate::catalog;
 use crate::models::{
     AppConfig, InstalledPackage, NetworkView, PackageView, PolicyChoiceView, PolicyView,
     ScheduledTaskView, Snapshot, SupportRequirement, SystemInfo, SystemSupport, TaskStatus,
+    ValueEditor,
 };
 use crate::state::AppState;
 use crate::windows::{self, hosts, packages, registry, services, system_settings, tasks};
@@ -31,9 +32,14 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
         problems.push(error.clone());
     }
     let enabled = |id: &str| config.policies.get(id).copied().unwrap_or(false);
+    let recommendations = catalog::policies()
+        .into_iter()
+        .map(|definition| (definition.id, definition.desired))
+        .collect::<HashMap<_, _>>();
 
     let mut views = Vec::new();
     for definition in catalog::configured_policies(config) {
+        let recommended = &recommendations[definition.id];
         let base = PolicyView {
             id: definition.id.to_owned(),
             name: definition.name.to_owned(),
@@ -42,21 +48,23 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
             enabled: enabled(definition.id),
             compliant: false,
             current: "Unavailable".to_owned(),
-            wanted: definition.selected_choice().map_or_else(
-                || definition.desired.label(),
-                |choice| choice.label.to_owned(),
-            ),
+            wanted: definition.wanted_label(),
             choices: definition
                 .choices
                 .iter()
                 .map(|choice| PolicyChoiceView {
                     id: choice.id.to_owned(),
                     label: choice.label.to_owned(),
+                    value: choice.value.label(),
                 })
                 .collect(),
             choice: definition
                 .selected_choice()
                 .map(|choice| choice.id.to_owned()),
+            editor: definition.editor,
+            recommended: definition.label_for(recommended),
+            recommended_enabled: definition.default_enabled,
+            registry: Some(definition.registry_location()),
             available: false,
             unavailable_reason: None,
         };
@@ -76,14 +84,7 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
         let view = match registry::read_policy(&definition) {
             Ok(current) => PolicyView {
                 compliant: definition.desired.is_satisfied_by(current.as_deref()),
-                current: definition
-                    .choices
-                    .iter()
-                    .find(|choice| choice.value.is_satisfied_by(current.as_deref()))
-                    .map_or_else(
-                        || current.unwrap_or_else(|| "Not set".to_owned()),
-                        |choice| choice.label.to_owned(),
-                    ),
+                current: definition.value_label(current.as_deref()),
                 available: true,
                 ..base
             },
@@ -111,6 +112,10 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
             wanted: "Unavailable".to_owned(),
             choices: Vec::new(),
             choice: None,
+            editor: ValueEditor::Choice,
+            recommended: "Unavailable".to_owned(),
+            recommended_enabled: true,
+            registry: None,
             available: false,
             unavailable_reason: None,
         };
@@ -125,6 +130,7 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
             Ok(current) => PolicyView {
                 compliant: current.compliant,
                 current: current.current,
+                recommended: current.wanted.clone(),
                 wanted: current.wanted,
                 available: current.available,
                 unavailable_reason: current.unavailable_reason,

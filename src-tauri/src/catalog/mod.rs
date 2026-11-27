@@ -15,6 +15,7 @@ macro_rules! policy {
             value_name: $value_name,
             desired: $crate::models::RegistryValue::Dword($value),
             choices: &[],
+            editor: $crate::models::ValueEditor::Choice,
             support: $crate::models::SupportRequirement::any(),
             default_enabled: true,
         }
@@ -32,6 +33,7 @@ macro_rules! text_policy {
             value_name: $value_name,
             desired: $crate::models::RegistryValue::Text($value),
             choices: &[],
+            editor: $crate::models::ValueEditor::Choice,
             support: $crate::models::SupportRequirement::any(),
             default_enabled: true,
         }
@@ -49,6 +51,7 @@ macro_rules! absent_policy {
             value_name: $value_name,
             desired: $crate::models::RegistryValue::Absent,
             choices: &[],
+            editor: $crate::models::ValueEditor::Choice,
             support: $crate::models::SupportRequirement::any(),
             default_enabled: true,
         }

@@ -30,11 +30,11 @@ pub fn read_policy(definition: &PolicyDefinition) -> Result<Option<String>, Stri
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(format!("Could not read {}: {error}", definition.name)),
     };
-    Ok(Some(format_current_value(&value, &definition.desired)))
+    Ok(Some(format_current_value(&value, definition.value_type())))
 }
 
-fn format_current_value(value: &RegValue<'_>, desired: &RegistryValue) -> String {
-    let decoded = match desired {
+fn format_current_value(value: &RegValue<'_>, value_type: &RegistryValue) -> String {
+    let decoded = match value_type {
         RegistryValue::Dword(_) => u32::from_reg_value(value).map(|value| value.to_string()),
         RegistryValue::Text(_) => String::from_reg_value(value),
         RegistryValue::Absent => return "Set".to_owned(),

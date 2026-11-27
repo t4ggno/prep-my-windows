@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use super::{
     configured_policies, network_blocks, packages, policies, scheduled_tasks, system_settings,
 };
-use crate::models::{AppConfig, RegistryValue};
+use crate::models::{AppConfig, RegistryValue, ValueEditor};
 
 fn all_unique(values: impl IntoIterator<Item = String>) -> bool {
     let mut unique = HashSet::new();
@@ -227,6 +227,43 @@ fn quality_of_life_policies_use_current_windows_settings() {
             "widgets-taskbar-button",
         ])
     );
+}
+
+#[test]
+fn every_policy_has_a_value_editor() {
+    for definition in policies() {
+        match definition.editor {
+            ValueEditor::Choice => assert!(
+                !definition.choices.is_empty(),
+                "{} has no choices",
+                definition.id
+            ),
+            ValueEditor::ActiveHoursStart | ValueEditor::ActiveHoursEnd => {
+                assert!(definition.choices.is_empty(), "{}", definition.id);
+            }
+        }
+    }
+}
+
+#[test]
+fn values_are_shown_with_their_meaning() {
+    let definitions = policies();
+    let find = |id: &str| definitions.iter().find(|item| item.id == id).unwrap();
+
+    assert_eq!(find("file-extensions").value_label(Some("1")), "Hidden");
+    assert_eq!(find("web-search").wanted_label(), "Off");
+    assert_eq!(find("web-search").value_label(Some("0")), "On");
+    assert_eq!(find("clipboard-history").wanted_label(), "On");
+    assert_eq!(find("update-active-hours-end").wanted_label(), "07:00");
+    assert_eq!(
+        find("update-active-hours-start").value_label(Some("8")),
+        "08:00"
+    );
+    assert_eq!(
+        find("update-active-hours-start").value_label(None),
+        "Not set"
+    );
+    assert_eq!(find("location").value_label(Some("1")), "Blocked");
 }
 
 #[test]

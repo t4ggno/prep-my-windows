@@ -13,7 +13,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo",
             "DisabledByGroupPolicy",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "advertising-id-user",
             "Advertising ID",
@@ -22,7 +23,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo",
             "Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "tailored-experiences",
             "Tailored experiences",
@@ -31,7 +33,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableTailoredExperiencesWithDiagnosticData",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "consumer-features",
             "Microsoft consumer features",
@@ -40,7 +43,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableWindowsConsumerFeatures",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "third-party-suggestions",
             "Third-party suggestions",
@@ -49,7 +53,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableThirdPartySuggestions",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "spotlight",
             "Windows Spotlight",
@@ -58,7 +63,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableWindowsSpotlightFeatures",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "spotlight-action-center",
             "Spotlight in notifications",
@@ -67,7 +73,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableWindowsSpotlightOnActionCenter",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "spotlight-settings",
             "Settings suggestions",
@@ -76,7 +83,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableWindowsSpotlightOnSettings",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "welcome-experience",
             "Windows welcome experience",
@@ -85,7 +93,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableWindowsSpotlightWindowsWelcomeExperience",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "soft-landing",
             "Windows tips",
@@ -94,7 +103,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableSoftLanding",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "cloud-content",
             "Cloud optimized content",
@@ -103,7 +113,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableCloudOptimizedContent",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "silent-app-installs",
             "Silent suggested app installs",
@@ -112,7 +123,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SilentInstalledAppsEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "start-suggestions",
             "Start menu suggestions",
@@ -121,7 +133,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SystemPaneSuggestionsEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "start-iris-recommendations",
             "Start tips and app recommendations",
@@ -131,6 +144,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start_IrisRecommendations",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_000)),
         policy!(
             "start-recommended-section",
@@ -141,6 +155,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "HideRecommendedSection",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .with_support(SupportRequirement::professional(22_621)),
         policy!(
             "start-recent-items",
@@ -151,6 +166,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start_TrackDocs",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_000)),
         policy!(
             "start-recent-apps",
@@ -160,7 +176,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Start",
             "ShowRecentList",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "lock-screen-spotlight",
             "Lock screen Spotlight",
@@ -169,7 +186,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "RotatingLockScreenEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "lock-screen-overlay",
             "Lock screen suggestions",
@@ -178,7 +196,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "RotatingLockScreenOverlayEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "content-tips",
             "Suggested content",
@@ -187,7 +206,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-338388Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "content-start",
             "Suggested apps in Start",
@@ -196,7 +216,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-338389Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "content-welcome",
             "Suggested welcome content",
@@ -205,7 +226,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-353694Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "content-settings",
             "Suggested Settings content",
@@ -214,7 +236,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-353696Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "lock-screen-tips",
             "Lock screen tips",
@@ -223,7 +246,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-338387Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "content-after-updates",
             "Welcome experience after updates",
@@ -232,7 +256,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-310093Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "content-settings-suggestions",
             "Suggested content in Settings",
@@ -241,7 +266,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-338393Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "content-timeline",
             "Timeline suggestions",
@@ -250,7 +276,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SubscribedContent-353698Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "setup-reminders",
             "Finish setup reminders",
@@ -259,7 +286,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\UserProfileEngagement",
             "ScoobeSystemSettingEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "settings-account-notifications",
             "Account notifications in Settings",
@@ -268,7 +296,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications",
             "EnableAccountNotifications",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "start-account-notifications",
             "Account notifications in Start",
@@ -277,7 +306,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
             "Start_AccountNotifications",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "explorer-sync-ads",
             "Sync provider ads in File Explorer",
@@ -286,7 +316,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
             "ShowSyncProviderNotifications",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "suggested-notifications",
             "Suggested notifications",
@@ -295,7 +326,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.Suggested",
             "Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "backup-reminders",
             "Backup reminders",
@@ -304,7 +336,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Notifications\Settings\Windows.SystemToast.BackupReminder",
             "Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "mobile-device-suggestions",
             "Mobile device suggestions",
@@ -313,7 +346,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Mobility",
             "OptedIn",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "start-phone-link",
             "Phone Link in Start",
@@ -323,6 +357,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "IsEnabled",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_621)),
         policy!(
             "start-website-recommendations",
@@ -333,6 +368,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "HideRecommendedPersonalizedSites",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_621)),
         policy!(
             "desktop-spotlight",
@@ -343,6 +379,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "DisableSpotlightCollectionOnDesktop",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_621)),
         policy!(
             "desktop-spotlight-icon",
@@ -353,6 +390,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "{2cc5ca98-6485-489a-920e-b3e88a6ccce3}",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_621)),
         policy!(
             "settings-account-ads",
@@ -362,7 +400,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableConsumerAccountStateContent",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         text_policy!(
             "settings-home",
             "Settings home page",
@@ -372,6 +411,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "SettingsPageVisibility",
             "hide:home"
         )
+        .with_choices(choices::SETTINGS_HOME)
         .with_support(SupportRequirement::windows_build(22_621)),
         policy!(
             "widgets",
@@ -382,6 +422,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "AllowNewsAndInterests",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(
             SupportRequirement::windows_build(22_000).blocked_by_user_choice_protection(),
         ),
@@ -394,6 +435,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "EnableFeeds",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::any().blocked_by_user_choice_protection()),
         policy!(
             "taskbar-search",
@@ -415,6 +457,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "TaskbarMn",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_000)),
         policy!(
             "meet-now",
@@ -424,7 +467,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
             "HideSCAMeetNow",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "online-tips",
             "Online tips in Settings",
@@ -433,7 +477,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
             "AllowOnlineTips",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "tips-notifications",
             "Tips and suggestions notifications",
@@ -442,7 +487,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager",
             "SoftLandingEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "ink-workspace-suggestions",
             "Suggested apps in Windows Ink Workspace",
@@ -451,6 +497,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\WindowsInkWorkspace",
             "AllowSuggestedAppsInWindowsInkWorkspace",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
     ]
 }

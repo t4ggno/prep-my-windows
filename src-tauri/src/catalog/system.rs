@@ -28,7 +28,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
             "HideFileExt",
             0
-        ),
+        )
+        .with_choices(choices::SHOWN_WHEN_ZERO),
         policy!(
             "taskbar-end-task",
             "Taskbar End task",
@@ -38,6 +39,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "TaskbarEndTask",
             1
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_631)),
         policy!(
             "detailed-crash-screen",
@@ -47,7 +49,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SYSTEM\CurrentControlSet\Control\CrashControl",
             "DisplayParameters",
             1
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "firmware-installed-software",
             "Firmware-installed software",
@@ -56,7 +59,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SYSTEM\CurrentControlSet\Control\Session Manager",
             "DisableWpbtExecution",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "user-choice-protection",
             "User Choice Protection",
@@ -66,7 +70,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::DRIVER_DISABLED),
+        .with_choices(choices::DRIVER_START),
         policy!(
             "maps-service",
             "Downloaded maps service",
@@ -76,7 +80,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "retail-demo-service",
             "Retail demo service",
@@ -86,7 +90,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "fast-startup",
             "Fast startup",
@@ -95,7 +99,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SYSTEM\CurrentControlSet\Control\Session Manager\Power",
             "HiberbootEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "remote-registry-service",
             "Remote Registry service",
@@ -105,7 +110,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "fax-service",
             "Fax service",
@@ -115,7 +120,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "media-sharing-service",
             "Windows Media Player sharing service",
@@ -125,7 +130,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "wallet-service",
             "Wallet service",
@@ -135,7 +140,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "parental-controls-service",
             "Parental controls service",
@@ -145,7 +150,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "link-tracking-service",
             "Distributed Link Tracking service",
@@ -155,7 +160,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "sysmain-service",
             "SysMain service",
@@ -165,7 +170,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED)
+        .with_choices(choices::SERVICE_START)
         .off_by_default(),
         policy!(
             "long-paths",
@@ -175,7 +180,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SYSTEM\CurrentControlSet\Control\FileSystem",
             "LongPathsEnabled",
             1
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "autorun",
             "AutoRun on all drives",
@@ -184,7 +190,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
             "NoDriveTypeAutoRun",
             255
-        ),
+        )
+        .with_choices(choices::AUTORUN),
         policy!(
             "remote-assistance",
             "Remote Assistance",
@@ -193,7 +200,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SYSTEM\CurrentControlSet\Control\Remote Assistance",
             "fAllowToGetHelp",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "automatic-device-encryption",
             "Automatic device encryption",
@@ -203,6 +211,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "PreventDeviceEncryption",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .off_by_default(),
         policy!(
             "standby-network-plugged-in",
@@ -212,7 +221,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             STANDBY_NETWORK,
             "ACSettingIndex",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "standby-network-on-battery",
             "Network in standby on battery",
@@ -221,7 +231,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             STANDBY_NETWORK,
             "DCSettingIndex",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "power-throttling",
             "Power throttling",
@@ -231,6 +242,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "PowerThrottlingOff",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .off_by_default(),
     ]
 }

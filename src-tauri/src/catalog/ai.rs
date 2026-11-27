@@ -13,7 +13,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Explorer",
             "DisableSearchBoxSuggestions",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "cloud-search",
             "Cloud search",
@@ -22,7 +23,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
             "AllowCloudSearch",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "web-search",
             "Windows web search",
@@ -31,7 +33,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
             "DisableWebSearch",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "connected-search",
             "Connected search",
@@ -40,7 +43,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
             "ConnectedSearchUseWeb",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "cortana",
             "Cortana",
@@ -49,7 +53,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
             "AllowCortana",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "recall-component",
             "Recall",
@@ -58,7 +63,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
             "AllowRecallEnablement",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "recall-snapshots",
             "Recall snapshots",
@@ -67,7 +73,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
             "DisableAIDataAnalysis",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "click-to-do",
             "Click to Do",
@@ -76,7 +83,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
             "DisableClickToDo",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "settings-agent",
             "Settings agent",
@@ -85,7 +93,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\WindowsAI",
             "DisableSettingsAgent",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "paint-cocreator",
             "Paint Cocreator",
@@ -94,7 +103,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint",
             "DisableCocreator",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "paint-image-creator",
             "Paint Image Creator",
@@ -103,7 +113,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint",
             "DisableImageCreator",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "paint-generative-fill",
             "Paint generative fill",
@@ -112,7 +123,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint",
             "DisableGenerativeFill",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "search-highlights",
             "Search highlights",
@@ -121,7 +133,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
             "EnableDynamicContentInWSB",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "cortana-consent",
             "Cortana consent",
@@ -130,7 +143,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
             "CortanaConsent",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "copilot-user",
             "Windows Copilot",
@@ -139,7 +153,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot",
             "TurnOffWindowsCopilot",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "copilot-machine",
             "Windows Copilot for all users",
@@ -148,7 +163,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot",
             "TurnOffWindowsCopilot",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "copilot-taskbar-button",
             "Copilot taskbar button",
@@ -157,7 +173,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
             "ShowCopilotButton",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "copilot-pin-prompt",
             "Copilot pin prompt",
@@ -166,7 +183,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
             "DisableCopilotPinScreen",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "notepad-ai",
             "Notepad AI features",
@@ -175,7 +193,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\WindowsNotepad",
             "DisableAIFeatures",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "ai-components-service",
             "AI components service autostart",
@@ -185,7 +204,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             3
         )
-        .with_choices(choices::SERVICE_MANUAL)
+        .with_choices(choices::SERVICE_START)
         .with_support(SupportRequirement::windows_build(26_100)),
         policy!(
             "search-location",
@@ -195,7 +214,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Search",
             "AllowSearchToUseLocation",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "bing-search",
             "Bing in Windows Search",
@@ -204,7 +224,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Search",
             "BingSearchEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "search-microsoft-account",
             "Search Microsoft account content",
@@ -213,7 +234,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
             "IsMSACloudSearchEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "search-work-account",
             "Search work or school account content",
@@ -222,7 +244,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
             "IsAADCloudSearchEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "search-history",
             "Search history on this device",
@@ -231,6 +254,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
             "IsDeviceSearchHistoryEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
     ]
 }

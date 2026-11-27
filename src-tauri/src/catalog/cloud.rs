@@ -13,7 +13,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\OneDrive",
             "DisableFileSyncNGSC",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "cloud-clipboard",
             "Cloud clipboard",
@@ -22,7 +23,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "AllowCrossDeviceClipboard",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "clipboard-history",
             "Clipboard history",
@@ -32,6 +34,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "EnableClipboardHistory",
             1
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(17_763)),
         policy!(
             "cross-device",
@@ -41,7 +44,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "EnableCdp",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "activity-publishing",
             "Activity publishing",
@@ -50,7 +54,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "PublishUserActivities",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "activity-upload",
             "Activity upload",
@@ -59,7 +64,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "UploadUserActivities",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "activity-feed",
             "Activity feed",
@@ -68,7 +74,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "EnableActivityFeed",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "settings-sync",
             "Windows settings sync",
@@ -77,7 +84,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\SettingSync",
             "DisableSettingSync",
             2
-        ),
+        )
+        .with_choices(choices::SETTINGS_SYNC),
         policy!(
             "settings-sync-override",
             "Settings sync override",
@@ -86,7 +94,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\SettingSync",
             "DisableSettingSyncUserOverride",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "delivery-optimization",
             "Update peer uploads",
@@ -105,7 +114,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\OneDrive",
             "PreventNetworkTrafficPreUserSignIn",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "message-sync",
             "Text message cloud sync",
@@ -114,7 +124,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Messaging",
             "AllowMessageSync",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "phone-pc-linking",
             "Phone-PC linking",
@@ -123,6 +134,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "EnableMmx",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
     ]
 }

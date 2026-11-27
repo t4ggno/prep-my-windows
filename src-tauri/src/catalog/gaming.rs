@@ -16,7 +16,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"System\GameConfigStore",
             "GameDVR_Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "game-capture",
             "Background game capture",
@@ -25,7 +26,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR",
             "AppCaptureEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "game-recording-policy",
             "Game recording policy",
@@ -34,7 +36,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\GameDVR",
             "AllowGameDVR",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "game-bar-controller",
             "Game Bar controller button",
@@ -43,7 +46,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\GameBar",
             "UseNexusForGameBarEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "game-bar-startup-tips",
             "Game Bar startup tips",
@@ -52,7 +56,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\GameBar",
             "ShowStartupPanel",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "game-mode",
             "Game Mode",
@@ -62,7 +67,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "AutoGameModeEnabled",
             1
         )
-        .with_choices(choices::ON_OFF),
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "gpu-scheduling",
             "Hardware-accelerated GPU scheduling",
@@ -82,7 +87,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             MOUSE,
             "MouseSpeed",
             "0"
-        ),
+        )
+        .with_choices(choices::POINTER_PRECISION),
         text_policy!(
             "pointer-acceleration-threshold",
             "Pointer acceleration threshold",
@@ -91,7 +97,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             MOUSE,
             "MouseThreshold1",
             "0"
-        ),
+        )
+        .with_choices(choices::POINTER_THRESHOLD),
         text_policy!(
             "pointer-acceleration-high-threshold",
             "Pointer high acceleration threshold",
@@ -100,7 +107,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             MOUSE,
             "MouseThreshold2",
             "0"
-        ),
+        )
+        .with_choices(choices::POINTER_HIGH_THRESHOLD),
         policy!(
             "multimedia-cpu-reservation",
             "Background CPU reservation for multimedia",
@@ -110,6 +118,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "SystemResponsiveness",
             10
         )
+        .with_choices(choices::MULTIMEDIA_RESERVATION)
         .off_by_default(),
     ]
 }

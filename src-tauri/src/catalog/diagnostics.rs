@@ -23,7 +23,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
             "LimitDiagnosticLogCollection",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "crash-dumps",
             "Crash dump collection",
@@ -32,7 +33,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
             "LimitDumpCollection",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "feedback-notifications",
             "Feedback requests",
@@ -41,7 +43,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
             "DoNotShowFeedbackNotifications",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "device-name-telemetry",
             "Device name in diagnostics",
@@ -50,7 +53,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
             "AllowDeviceNameInTelemetry",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "application-telemetry",
             "Application telemetry",
@@ -59,7 +63,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\AppCompat",
             "AITEnable",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "application-inventory",
             "Application inventory",
@@ -68,7 +73,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\AppCompat",
             "DisableInventory",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "explorer-instrumentation",
             "Explorer instrumentation",
@@ -77,7 +83,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Explorer",
             "NoInstrumentation",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "error-reporting",
             "Windows error reporting",
@@ -86,7 +93,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting",
             "Disabled",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "customer-experience",
             "Customer Experience Improvement Program",
@@ -95,7 +103,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\SQMClient\Windows",
             "CEIPEnable",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "connected-user-service",
             "Connected User Experiences service",
@@ -105,7 +114,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "wap-push-service",
             "Device management push service",
@@ -115,7 +124,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "diagnostic-data-preference",
             "Diagnostic data preference",
@@ -134,7 +143,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Siuf\Rules",
             "NumberOfSIUFInPeriod",
             0
-        ),
+        )
+        .with_choices(choices::FEEDBACK_FREQUENCY),
         policy!(
             "error-reporting-service",
             "Error reporting service",
@@ -144,7 +154,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             4
         )
-        .with_choices(choices::SERVICE_DISABLED),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "defender-sample-submission",
             "Defender sample submission",
@@ -163,7 +173,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
             "DisableOneSettingsDownloads",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "diagnostic-change-notifications",
             "Diagnostic data change notifications",
@@ -172,7 +183,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\DataCollection",
             "DisableTelemetryOptInChangeNotification",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "error-reporting-additional-data",
             "Additional error report data",
@@ -181,7 +193,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting",
             "DontSendAdditionalData",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "removal-tool-reports",
             "Malicious Software Removal Tool reports",
@@ -190,7 +203,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\MRT",
             "DontReportInfectionInformation",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "steps-recorder",
             "Steps Recorder",
@@ -199,7 +213,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\AppCompat",
             "DisableUAR",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "disk-health-updates",
             "Disk health model updates",
@@ -208,7 +223,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\StorageHealth",
             "AllowDiskHealthModelUpdates",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "kms-online-validation",
             "KMS client online validation",
@@ -217,6 +233,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\Software Protection Platform",
             "NoGenTicket",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
     ]
 }

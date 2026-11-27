@@ -41,7 +41,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "SensorPermissionState",
             1
         )
-        .with_choices(choices::ON_OFF),
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "location-service",
             "Location service",
@@ -51,7 +51,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Status",
             1
         )
-        .with_choices(choices::ON_OFF),
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "location-service-start",
             "Location service startup",
@@ -61,7 +61,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "Start",
             3
         )
-        .with_choices(choices::SERVICE_MANUAL),
+        .with_choices(choices::SERVICE_START),
         policy!(
             "typing-data",
             "Typing data collection",
@@ -70,7 +70,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Input\TIPC",
             "Enabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "implicit-ink",
             "Implicit ink collection",
@@ -79,7 +80,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\InputPersonalization",
             "RestrictImplicitInkCollection",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "implicit-text",
             "Implicit text collection",
@@ -88,7 +90,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\InputPersonalization",
             "RestrictImplicitTextCollection",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "contact-harvesting",
             "Contact harvesting",
@@ -97,7 +100,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore",
             "HarvestContacts",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "handwriting-data",
             "Handwriting data sharing",
@@ -106,7 +110,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\TabletPC",
             "PreventHandwritingDataSharing",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "handwriting-errors",
             "Handwriting error reports",
@@ -115,7 +120,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\HandwritingErrorReports",
             "PreventHandwritingErrorReports",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "app-diagnostics",
             "App access to diagnostics",
@@ -243,7 +249,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy",
             "TailoredExperiencesWithDiagnosticDataEnabled",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "online-speech",
             "Online speech recognition",
@@ -252,7 +259,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy",
             "HasAccepted",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "inking-typing-personalization",
             "Inking and typing personalization",
@@ -261,7 +269,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Personalization\Settings",
             "AcceptedPrivacyPolicy",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "app-launch-tracking",
             "App launch tracking",
@@ -270,7 +279,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
             "Start_TrackProgs",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "device-metadata",
             "Device metadata downloads",
@@ -279,7 +289,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\Device Metadata",
             "PreventDeviceMetadataFromNetwork",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "app-calendar",
             "App access to calendar",
@@ -410,7 +421,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"Control Panel\International\User Profile",
             "HttpAcceptLanguageOptOut",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "find-my-device",
             "Find my device",
@@ -419,7 +431,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\FindMyDevice",
             "AllowFindMyDevice",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "speech-model-updates",
             "Speech model updates",
@@ -428,7 +441,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Speech",
             "AllowSpeechModelUpdate",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "online-font-providers",
             "Online font providers",
@@ -437,7 +451,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "EnableFontProviders",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "online-app-lookup",
             "Online app lookup for unknown files",
@@ -446,7 +461,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer",
             "NoInternetOpenWith",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "media-drm-online",
             "Windows Media DRM internet access",
@@ -455,7 +471,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\WMDRM",
             "DisableOnline",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "apps-for-websites",
             "Apps for websites",
@@ -464,7 +481,8 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             r"SOFTWARE\Policies\Microsoft\Windows\System",
             "EnableAppUriHandlers",
             0
-        ),
+        )
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "connectivity-probe",
             "Internet connectivity probe",
@@ -474,6 +492,7 @@ pub(super) fn policies() -> Vec<PolicyDefinition> {
             "NoActiveProbe",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .off_by_default(),
     ]
 }

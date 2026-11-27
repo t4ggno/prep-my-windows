@@ -16,7 +16,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use crate::models::{
     PolicyDefinition, RegistryHive, RegistryValue, SupportRequirement, SystemSettingKind,
-    SystemSettingState,
+    SystemSettingState, ValueEditor,
 };
 
 const WIDGETS_PACKAGE_PREFIX: &str = "MicrosoftWindows.Client.WebExperience_";
@@ -311,6 +311,7 @@ fn widgets_taskbar_policy() -> PolicyDefinition {
         value_name: "TaskbarDa",
         desired: RegistryValue::Dword(0),
         choices: &[],
+        editor: ValueEditor::Choice,
         support: SupportRequirement::windows_build(22_000).blocked_by_user_choice_protection(),
         default_enabled: true,
     }

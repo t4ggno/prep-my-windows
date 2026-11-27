@@ -16,10 +16,12 @@ import { AppsView } from "@/views/AppsView";
 import { AutostartView } from "@/views/AutostartView";
 import { NetworkView } from "@/views/NetworkView";
 import { OverviewView } from "@/views/OverviewView";
-import { PolicyView } from "@/views/PolicyView";
+import { PolicyView } from "@/views/policy/PolicyView";
 import { ProcessesView } from "@/views/ProcessesView";
 import { SettingsView } from "@/views/SettingsView";
+import { hourLabel } from "@/lib/activeHours";
 import type {
+  ActiveHours,
   AutostartEntry,
   CatalogSection,
   InstalledPackage,
@@ -63,6 +65,20 @@ function setPolicyChoice(snapshot: Snapshot, id: string, choice: string): Snapsh
             wanted: item.choices.find((option) => option.id === choice)?.label ?? item.wanted,
           }
         : item,
+    ),
+  };
+}
+
+function setActiveHours(snapshot: Snapshot, hours: ActiveHours): Snapshot {
+  const wanted: Record<string, number> = {
+    "update-active-hours-start": hours.activeHoursStart,
+    "update-active-hours-end": hours.activeHoursEnd,
+  };
+  return {
+    ...snapshot,
+    settings: { ...snapshot.settings, ...hours },
+    policies: snapshot.policies.map((item) =>
+      item.id in wanted ? { ...item, wanted: hourLabel(wanted[item.id]) } : item,
     ),
   };
 }
@@ -215,6 +231,16 @@ export default function App() {
     return mutate("settings", () => api.updateRuntimeSettings(settings));
   }
 
+  function changeActiveHours(hours: ActiveHours) {
+    if (!snapshot) return;
+    const settings = { startWithWindows: snapshot.settings.startWithWindows, ...hours };
+    void mutate(
+      "settings",
+      () => api.updateRuntimeSettings(settings),
+      (current) => setActiveHours(current, hours),
+    );
+  }
+
   async function exportProfile() {
     const path = await save({
       defaultPath: "prep-my-windows-policy.json",
@@ -303,10 +329,15 @@ export default function App() {
         <PolicyView
           policies={snapshot.policies}
           tasks={snapshot.scheduledTasks}
+          activeHours={{
+            activeHoursStart: snapshot.settings.activeHoursStart,
+            activeHoursEnd: snapshot.settings.activeHoursEnd,
+          }}
           pending={pending}
           onTogglePolicies={(ids, enabled) => toggleCatalog("policies", ids, enabled)}
           onToggleTasks={(ids, enabled) => toggleCatalog("scheduledTasks", ids, enabled)}
           onChoosePolicyOption={choosePolicyOption}
+          onChangeActiveHours={changeActiveHours}
         />
       )}
       {section === "apps" && (

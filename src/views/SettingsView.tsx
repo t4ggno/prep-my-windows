@@ -1,26 +1,12 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { Download, LoaderCircle, RefreshCw, RotateCcw, Upload } from "lucide-react";
+import { ActiveHoursPicker } from "@/components/ActiveHoursPicker";
 import { ViewHeader } from "@/components/common";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import type { DesktopUpdate } from "@/hooks/useDesktopUpdate";
 import type { AppSettings, RuntimeSettings, SystemInfo } from "@/types";
-
-const hours = Array.from({ length: 24 }, (_, hour) => hour);
-const MAX_ACTIVE_HOURS = 18;
-
-function hourLabel(hour: number) {
-  return `${hour.toString().padStart(2, "0")}:00`;
-}
-
-function activeHoursError(settings: RuntimeSettings) {
-  const span = (settings.activeHoursEnd - settings.activeHoursStart + 24) % 24;
-  if (span === 0) return "Start and end must differ";
-  if (span > MAX_ACTIVE_HOURS) return `Active hours can span at most ${MAX_ACTIVE_HOURS} hours`;
-  return null;
-}
 
 function savedSettings(settings: AppSettings): RuntimeSettings {
   return {
@@ -28,34 +14,6 @@ function savedSettings(settings: AppSettings): RuntimeSettings {
     activeHoursStart: settings.activeHoursStart,
     activeHoursEnd: settings.activeHoursEnd,
   };
-}
-
-function HourSelect({
-  value,
-  onChange,
-  invalid,
-  label,
-}: {
-  value: number;
-  onChange: (hour: number) => void;
-  invalid: boolean;
-  label: string;
-}) {
-  return (
-    <Select
-      className="w-28"
-      value={value}
-      aria-label={label}
-      aria-invalid={invalid || undefined}
-      onChange={(event) => onChange(Number(event.target.value))}
-    >
-      {hours.map((hour) => (
-        <option key={hour} value={hour}>
-          {hourLabel(hour)}
-        </option>
-      ))}
-    </Select>
-  );
 }
 
 export function SettingsView({
@@ -86,7 +44,6 @@ export function SettingsView({
     (draft.startWithWindows !== saved.startWithWindows ||
       draft.activeHoursStart !== saved.activeHoursStart ||
       draft.activeHoursEnd !== saved.activeHoursEnd);
-  const validation = activeHoursError(values);
   const saving = pending.has("settings");
   const profileBusy = pending.has("profile");
 
@@ -118,26 +75,11 @@ export function SettingsView({
         <div className="settings-row">
           <span>Windows Update active hours</span>
           <div className="flex items-center gap-2 text-xs text-zinc-500">
-            <HourSelect
-              label="Active hours start"
-              value={values.activeHoursStart}
-              invalid={validation !== null}
-              onChange={(activeHoursStart) => update({ activeHoursStart })}
-            />
+            <ActiveHoursPicker className="w-28" hours={values} edge="start" onChange={update} />
             <span>to</span>
-            <HourSelect
-              label="Active hours end"
-              value={values.activeHoursEnd}
-              invalid={validation !== null}
-              onChange={(activeHoursEnd) => update({ activeHoursEnd })}
-            />
+            <ActiveHoursPicker className="w-28" hours={values} edge="end" onChange={update} />
           </div>
         </div>
-        {validation && (
-          <div className="field-error" role="alert">
-            {validation}
-          </div>
-        )}
         <label className="settings-row">
           <span>Start with Windows</span>
           <Switch
@@ -146,7 +88,7 @@ export function SettingsView({
           />
         </label>
         <div className="settings-actions">
-          <Button onClick={save} disabled={!dirty || validation !== null || saving}>
+          <Button onClick={save} disabled={!dirty || saving}>
             {saving && <LoaderCircle className="size-4 animate-spin" />}
             Save settings
           </Button>

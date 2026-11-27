@@ -1,5 +1,5 @@
 use super::choices;
-use crate::models::{PolicyDefinition, RegistryHive, SupportRequirement};
+use crate::models::{PolicyDefinition, RegistryHive, SupportRequirement, ValueEditor};
 
 pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<PolicyDefinition> {
     use RegistryHive::LocalMachine as Lm;
@@ -14,6 +14,7 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             "SmartActiveHoursState",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(14_393)),
         policy!(
             "update-active-hours-start",
@@ -24,6 +25,7 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             "ActiveHoursStart",
             u32::from(active_hours_start)
         )
+        .with_editor(ValueEditor::ActiveHoursStart)
         .with_support(SupportRequirement::windows_build(14_393)),
         policy!(
             "update-active-hours-end",
@@ -34,6 +36,7 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             "ActiveHoursEnd",
             u32::from(active_hours_end)
         )
+        .with_editor(ValueEditor::ActiveHoursEnd)
         .with_support(SupportRequirement::windows_build(14_393)),
         policy!(
             "update-early-features",
@@ -44,6 +47,7 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             "IsContinuousInnovationOptedIn",
             0
         )
+        .with_choices(choices::ON_WHEN_ONE)
         .with_support(SupportRequirement::windows_build(22_621)),
         policy!(
             "update-signed-in-restart",
@@ -53,7 +57,8 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             r"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU",
             "NoAutoRebootWithLoggedOnUsers",
             1
-        ),
+        )
+        .with_choices(choices::OFF_WHEN_ONE),
         policy!(
             "update-restart-notifications",
             "Update restart notifications",
@@ -63,7 +68,7 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             "RestartNotificationsAllowed2",
             1
         )
-        .with_choices(choices::ON_OFF),
+        .with_choices(choices::ON_WHEN_ONE),
         policy!(
             "update-drivers",
             "Driver updates",
@@ -73,6 +78,7 @@ pub(super) fn policies(active_hours_start: u8, active_hours_end: u8) -> Vec<Poli
             "ExcludeWUDriversInQualityUpdate",
             1
         )
+        .with_choices(choices::OFF_WHEN_ONE)
         .off_by_default(),
     ]
 }
