@@ -163,10 +163,10 @@ fn folder_entries() -> Result<Vec<AutostartEntry>, String> {
         {
             let entry = result.map_err(|error| format!("Could not read startup item: {error}"))?;
             let path = entry.path();
-            if !path.is_file() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !path.is_file() || name.eq_ignore_ascii_case("desktop.ini") {
                 continue;
             }
-            let name = entry.file_name().to_string_lossy().into_owned();
             let location = path.to_string_lossy().into_owned();
             entries.push(AutostartEntry {
                 id: format!("folder:{location}"),
