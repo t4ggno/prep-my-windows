@@ -11,7 +11,7 @@ use crate::windows::{self, hosts, packages, registry, services, system_settings,
 
 struct PolicyViews {
     views: Vec<PolicyView>,
-    issues: Vec<String>,
+    problems: Vec<String>,
 }
 
 fn unavailable_reason(
@@ -26,9 +26,9 @@ fn unavailable_reason(
 
 fn policy_views(config: &AppConfig) -> PolicyViews {
     let support = windows::support_info();
-    let mut issues = Vec::new();
+    let mut problems = Vec::new();
     if let Err(error) = &support {
-        issues.push(error.clone());
+        problems.push(error.clone());
     }
     let enabled = |id: &str| config.policies.get(id).copied().unwrap_or(false);
 
@@ -88,7 +88,7 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
                 ..base
             },
             Err(error) => {
-                issues.push(error);
+                problems.push(error);
                 PolicyView {
                     current: "Unreadable".to_owned(),
                     available: true,
@@ -131,7 +131,7 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
                 ..base
             },
             Err(error) => {
-                issues.push(error);
+                problems.push(error);
                 PolicyView {
                     current: "Unreadable".to_owned(),
                     available: true,
@@ -142,7 +142,7 @@ fn policy_views(config: &AppConfig) -> PolicyViews {
         views.push(view);
     }
 
-    PolicyViews { views, issues }
+    PolicyViews { views, problems }
 }
 
 fn package_views(config: &AppConfig, installed_packages: &[InstalledPackage]) -> Vec<PackageView> {
@@ -173,10 +173,10 @@ fn package_views(config: &AppConfig, installed_packages: &[InstalledPackage]) ->
         .collect()
 }
 
-fn network_views(config: &AppConfig, issues: &mut Vec<String>) -> Vec<NetworkView> {
+fn network_views(config: &AppConfig, problems: &mut Vec<String>) -> Vec<NetworkView> {
     let definitions = catalog::network_blocks();
     let blocked = hosts::statuses(&definitions).unwrap_or_else(|error| {
-        issues.push(error);
+        problems.push(error);
         vec![false; definitions.len()]
     });
     definitions
@@ -198,10 +198,10 @@ fn network_views(config: &AppConfig, issues: &mut Vec<String>) -> Vec<NetworkVie
 fn task_views(
     config: &AppConfig,
     states: Result<HashMap<String, TaskStatus>, String>,
-    issues: &mut Vec<String>,
+    problems: &mut Vec<String>,
 ) -> Vec<ScheduledTaskView> {
     let states = states.unwrap_or_else(|error| {
-        issues.push(error);
+        problems.push(error);
         HashMap::new()
     });
     catalog::scheduled_tasks()
@@ -240,13 +240,22 @@ pub fn build(state: &AppState, system: SystemInfo) -> Snapshot {
         )
     });
 
-    let mut issues = policies.issues;
-    let installed_packages = installed_packages.unwrap_or_else(|error| {
-        issues.push(format!("Could not list installed apps: {error}"));
-        Vec::new()
-    });
-    let network_blocks = network_views(&config, &mut issues);
-    let scheduled_tasks = task_views(&config, task_states, &mut issues);
+    let mut problems = policies.problems;
+    let installed_packages = match installed_packages {
+        Ok(packages) => {
+            state.remember_installed_packages(packages.clone());
+            packages
+        }
+        Err(error) => {
+            problems.push(format!("Could not list installed apps: {error}"));
+            state.installed_packages()
+        }
+    };
+    let network_blocks = network_views(&config, &mut problems);
+    let scheduled_tasks = task_views(&config, task_states, &mut problems);
+    for problem in problems {
+        state.report_problem(problem);
+    }
 
     Snapshot {
         system,
@@ -258,6 +267,5 @@ pub fn build(state: &AppState, system: SystemInfo) -> Snapshot {
         network_blocks,
         scheduled_tasks,
         activity: state.activity(),
-        issues,
     }
 }

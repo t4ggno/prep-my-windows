@@ -1,14 +1,17 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use uuid::Uuid;
 
 use crate::catalog;
-use crate::models::{ActivityEvent, AppConfig, EngineStatus};
+use crate::models::{ActivityEvent, AppConfig, EngineStatus, InstalledPackage};
+
+const PROBLEM_REPEAT_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 fn normalize_catalog_selections(config: &mut AppConfig) {
     fn sync_selections<'a>(
@@ -72,6 +75,8 @@ struct Inner {
     status: RwLock<EngineStatus>,
     activity: RwLock<Vec<ActivityEvent>>,
     process_allowances: RwLock<HashSet<String>>,
+    reported_problems: Mutex<HashMap<String, Instant>>,
+    installed_packages: RwLock<Vec<InstalledPackage>>,
     enforcement: Mutex<()>,
 }
 
@@ -97,6 +102,8 @@ impl AppState {
                 status: RwLock::new(EngineStatus::default()),
                 activity: RwLock::new(Vec::new()),
                 process_allowances: RwLock::new(HashSet::new()),
+                reported_problems: Mutex::new(HashMap::new()),
+                installed_packages: RwLock::new(Vec::new()),
                 enforcement: Mutex::new(()),
             }),
         };
@@ -161,12 +168,10 @@ impl AppState {
         self.inner.enforcement.try_lock()
     }
 
-    pub fn complete_enforcement(&self, repaired: u64, killed: u64, last_error: Option<String>) {
+    pub fn complete_enforcement(&self, repaired: u64) {
         let mut status = self.inner.status.write();
         status.last_enforced_at = Some(Utc::now().to_rfc3339());
         status.repaired_total += repaired;
-        status.killed_total += killed;
-        status.last_error = last_error;
     }
 
     pub fn record_kills(&self, killed: u64) {
@@ -192,8 +197,31 @@ impl AppState {
         activity.truncate(250);
     }
 
+    pub fn report_problem(&self, message: impl Into<String>) {
+        let message = message.into();
+        let now = Instant::now();
+        {
+            let mut reported = self.inner.reported_problems.lock();
+            reported.retain(|_, at| now.duration_since(*at) < PROBLEM_REPEAT_INTERVAL);
+            if reported.contains_key(&message) {
+                return;
+            }
+            reported.insert(message.clone(), now);
+        }
+        self.add_activity("Error", message, false);
+    }
+
     pub fn clear_activity(&self) {
         self.inner.activity.write().clear();
+        self.inner.reported_problems.lock().clear();
+    }
+
+    pub fn installed_packages(&self) -> Vec<InstalledPackage> {
+        self.inner.installed_packages.read().clone()
+    }
+
+    pub fn remember_installed_packages(&self, packages: Vec<InstalledPackage>) {
+        *self.inner.installed_packages.write() = packages;
     }
 
     pub fn allow_process_once(&self, process_key: String) {
@@ -362,6 +390,23 @@ mod tests {
 
         assert!(state.consume_process_allowance("app.exe"));
         assert!(!state.consume_process_allowance("app.exe"));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn repeated_problems_are_logged_once() {
+        let directory = temporary_directory();
+        let state = AppState::load(&directory).unwrap();
+
+        state.report_problem("A");
+        state.report_problem("A");
+        state.report_problem("B");
+        assert_eq!(state.activity().len(), 2);
+        assert!(state.activity().iter().all(|event| !event.success));
+
+        state.clear_activity();
+        state.report_problem("A");
+        assert_eq!(state.activity().len(), 1);
         fs::remove_dir_all(directory).unwrap();
     }
 

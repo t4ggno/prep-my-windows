@@ -19,7 +19,6 @@ export interface EngineStatus {
   lastEnforcedAt: string | null;
   repairedTotal: number;
   killedTotal: number;
-  lastError: string | null;
 }
 
 export interface SystemInfo {
@@ -164,7 +163,6 @@ export interface Snapshot {
   networkBlocks: NetworkItem[];
   scheduledTasks: ScheduledTaskItem[];
   activity: ActivityEvent[];
-  issues: string[];
 }
 
 export interface LiveState {

@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   Ban,
   Boxes,
   Check,
@@ -67,7 +66,6 @@ function SummaryRow({
 const heroIcons = {
   active: ShieldCheck,
   busy: LoaderCircle,
-  attention: AlertTriangle,
   off: ShieldOff,
 };
 
@@ -103,21 +101,12 @@ export function OverviewView({
         </div>
         <div className="min-w-0 flex-1">
           <h2>{engineStateLabels[state]}</h2>
-          {state === "attention" && snapshot.status.lastError ? (
-            <button
-              className="mt-1 block max-w-full truncate text-left text-sm text-amber-200/70 hover:text-amber-100"
-              onClick={() => onNavigate("activity")}
-            >
-              {snapshot.status.lastError}
-            </button>
-          ) : (
-            <div
-              className="mt-1 text-sm text-zinc-500"
-              title={formatTimestamp(snapshot.status.lastEnforcedAt)}
-            >
-              Last enforced {formatRelative(snapshot.status.lastEnforcedAt, now)}
-            </div>
-          )}
+          <div
+            className="mt-1 text-sm text-zinc-500"
+            title={formatTimestamp(snapshot.status.lastEnforcedAt)}
+          >
+            Last enforced {formatRelative(snapshot.status.lastEnforcedAt, now)}
+          </div>
         </div>
       </section>
 

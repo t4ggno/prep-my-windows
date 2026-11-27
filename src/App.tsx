@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { AlertCircle, AlertTriangle, LoaderCircle, X } from "lucide-react";
+import { AlertCircle, LoaderCircle, X } from "lucide-react";
 import { api } from "@/api";
 import markUrl from "@/assets/mark.svg";
 import { AppShell } from "@/components/AppShell";
@@ -80,7 +80,6 @@ export default function App() {
   const updater = useDesktopUpdate();
   const [section, setSection] = useState<Section>("overview");
   const [confirmation, setConfirmation] = useState<ConfirmRequest | null>(null);
-  const [dismissedIssues, setDismissedIssues] = useState("");
   const reportError = useCallback((caught: unknown) => setError(errorMessage(caught)), [setError]);
   const autostarts = useResource(api.listAutostarts, reportError);
   const processes = useResource(api.listProcesses, reportError);
@@ -267,9 +266,6 @@ export default function App() {
     );
   }
 
-  const issuesKey = snapshot.issues.join("\n");
-  const showIssues = snapshot.issues.length > 0 && issuesKey !== dismissedIssues;
-
   return (
     <AppShell
       section={section}
@@ -288,15 +284,6 @@ export default function App() {
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <span className="banner-text">{error}</span>
           <button onClick={() => setError(null)} aria-label="Dismiss">
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
-      {showIssues && (
-        <div className="banner warning" role="status">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span className="banner-text">{issuesKey}</span>
-          <button onClick={() => setDismissedIssues(issuesKey)} aria-label="Dismiss">
             <X className="size-4" />
           </button>
         </div>

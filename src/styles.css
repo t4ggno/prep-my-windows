@@ -176,11 +176,6 @@
     animation: pulse 1.4s ease-in-out infinite;
   }
 
-  .engine-dot.attention {
-    background: #fbbf24;
-    box-shadow: 0 0 10px rgba(251, 191, 36, 0.45);
-  }
-
   .engine-dot.off {
     background: #71717a;
   }
@@ -265,23 +260,6 @@
     background: rgba(14, 165, 233, 0.08);
     filter: blur(35px);
     content: "";
-  }
-
-  .hero-status.attention {
-    border-color: rgba(251, 191, 36, 0.2);
-    background:
-      linear-gradient(115deg, rgba(251, 191, 36, 0.09), rgba(251, 191, 36, 0.015) 50%),
-      rgba(255, 255, 255, 0.022);
-  }
-
-  .hero-status.attention .hero-shield {
-    border-color: rgba(251, 191, 36, 0.22);
-    color: #fcd34d;
-    background: rgba(251, 191, 36, 0.1);
-  }
-
-  .hero-status.attention::after {
-    background: rgba(251, 191, 36, 0.06);
   }
 
   .hero-status.off {
@@ -804,12 +782,6 @@
     border-color: rgba(248, 113, 113, 0.18);
     color: #fca5a5;
     background: rgba(248, 113, 113, 0.065);
-  }
-
-  .banner.warning {
-    border-color: rgba(251, 191, 36, 0.18);
-    color: #fcd34d;
-    background: rgba(251, 191, 36, 0.06);
   }
 
   .banner-text {

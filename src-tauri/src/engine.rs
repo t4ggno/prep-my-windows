@@ -18,12 +18,6 @@ const RUNTIME_RECONCILIATION_INTERVAL: Duration = Duration::from_secs(60 * 60);
 const SLOW_RECONCILIATION_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 const MONITOR_READY_TIMEOUT: Duration = Duration::from_secs(10);
 
-fn report_errors(state: &AppState, errors: &[String]) {
-    for error in errors {
-        state.add_activity("Error", error, false);
-    }
-}
-
 #[derive(Default)]
 struct EnforcementOutcome {
     repaired: u64,
@@ -37,17 +31,11 @@ impl EnforcementOutcome {
     }
 
     fn complete(self, state: &AppState) -> u64 {
-        report_errors(state, &self.errors);
-        state.complete_enforcement(self.repaired, 0, failure_summary(&self.errors));
+        for error in self.errors {
+            state.report_problem(error);
+        }
+        state.complete_enforcement(self.repaired);
         self.repaired
-    }
-}
-
-fn failure_summary(errors: &[String]) -> Option<String> {
-    match errors {
-        [] => None,
-        [error] => Some(error.clone()),
-        errors => Some(format!("{} changes could not be applied", errors.len())),
     }
 }
 
@@ -305,11 +293,7 @@ fn spawn_reconciliation(
             if let Err(error) =
                 tauri::async_runtime::spawn_blocking(move || enforce(&task_app, &task_state)).await
             {
-                state.add_activity(
-                    "Error",
-                    format!("Enforcement stopped unexpectedly: {error}"),
-                    false,
-                );
+                state.report_problem(format!("Enforcement stopped unexpectedly: {error}"));
                 publish_live_state(&app, &state);
             }
         }
@@ -342,7 +326,7 @@ pub fn start(app: AppHandle, state: AppState) -> Result<(), String> {
 mod tests {
     use super::{
         EnforcementOutcome, RUNTIME_RECONCILIATION_INTERVAL, SLOW_RECONCILIATION_INTERVAL,
-        disabled_service_name, failure_summary, reapplied_message,
+        disabled_service_name, reapplied_message,
     };
     use crate::catalog;
 
@@ -366,19 +350,6 @@ mod tests {
         assert_eq!(
             reapplied_message(&["A", "B", "C", "D"]),
             "Reapplied 4 settings"
-        );
-    }
-
-    #[test]
-    fn summarizes_enforcement_failures() {
-        assert_eq!(failure_summary(&[]), None);
-        assert_eq!(
-            failure_summary(&["Could not enforce A".to_owned()]),
-            Some("Could not enforce A".to_owned())
-        );
-        assert_eq!(
-            failure_summary(&["A".to_owned(), "B".to_owned(), "C".to_owned()]),
-            Some("3 changes could not be applied".to_owned())
         );
     }
 

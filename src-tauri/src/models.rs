@@ -441,7 +441,6 @@ pub struct EngineStatus {
     pub last_enforced_at: Option<String>,
     pub repaired_total: u64,
     pub killed_total: u64,
-    pub last_error: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -466,7 +465,6 @@ pub struct Snapshot {
     pub network_blocks: Vec<NetworkView>,
     pub scheduled_tasks: Vec<ScheduledTaskView>,
     pub activity: Vec<ActivityEvent>,
-    pub issues: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]

@@ -153,7 +153,7 @@ fn report_errors(app: &AppHandle, state: &AppState, errors: &[String]) {
         return;
     }
     for error in errors {
-        state.add_activity("Error", error, false);
+        state.report_problem(error.clone());
     }
     publish_live_state(app, state);
 }
