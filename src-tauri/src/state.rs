@@ -9,6 +9,7 @@ use parking_lot::{Mutex, MutexGuard, RwLock};
 use uuid::Uuid;
 
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::catalog;
 use crate::change_history::{self, AppliedChange, ChangeHistory, ReappliedChange};
@@ -76,14 +77,63 @@ fn write_json(path: &Path, value: &impl Serialize, label: &str) -> Result<(), St
         .map_err(|error| format!("Could not save {label}: {error}"))
 }
 
-fn read_history(path: &Path) -> Result<ChangeHistory, String> {
+fn read_json<T: DeserializeOwned>(path: &Path, label: &str) -> Result<Option<T>, String> {
     if !path.exists() {
-        return Ok(ChangeHistory::default());
+        return Ok(None);
     }
-    let content = fs::read_to_string(path)
-        .map_err(|error| format!("Could not read change history: {error}"))?;
+    let content =
+        fs::read_to_string(path).map_err(|error| format!("Could not read {label}: {error}"))?;
     serde_json::from_str(&content)
-        .map_err(|error| format!("Could not parse change history: {error}"))
+        .map(Some)
+        .map_err(|error| format!("Could not parse {label}: {error}"))
+}
+
+fn read_profile(path: &Path) -> Result<AppConfig, String> {
+    let mut config = read_json(path, "profile")?.unwrap_or_default();
+    normalize_catalog_selections(&mut config);
+    config.validate()?;
+    Ok(config)
+}
+
+fn set_aside(path: &Path) -> Result<PathBuf, String> {
+    let stem = path
+        .file_stem()
+        .map_or_else(|| "file".into(), |stem| stem.to_string_lossy());
+    let kept = path.with_file_name(format!(
+        "{stem}.invalid-{}.json",
+        Utc::now().format("%Y%m%d-%H%M%S")
+    ));
+    fs::rename(path, &kept)
+        .map_err(|error| format!("Could not move {} aside: {error}", path.display()))?;
+    Ok(kept)
+}
+
+struct Recovered<T> {
+    value: T,
+    problem: Option<String>,
+}
+
+fn recover<T: Default>(
+    path: &Path,
+    label: &str,
+    read: impl FnOnce(&Path) -> Result<T, String>,
+) -> Result<Recovered<T>, String> {
+    match read(path) {
+        Ok(value) => Ok(Recovered {
+            value,
+            problem: None,
+        }),
+        Err(error) => {
+            let kept = set_aside(path).map_err(|move_error| format!("{error}; {move_error}"))?;
+            Ok(Recovered {
+                value: T::default(),
+                problem: Some(format!(
+                    "{error}. Started with a new {label}; the old file was kept as {}",
+                    kept.display()
+                )),
+            })
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -109,24 +159,17 @@ impl AppState {
         fs::create_dir_all(config_directory)
             .map_err(|error| format!("Could not create {}: {error}", config_directory.display()))?;
         let config_path = config_directory.join("policy.json");
-        let mut config = if config_path.exists() {
-            let content = fs::read_to_string(&config_path)
-                .map_err(|error| format!("Could not read profile: {error}"))?;
-            serde_json::from_str(&content)
-                .map_err(|error| format!("Could not parse profile: {error}"))?
-        } else {
-            AppConfig::default()
-        };
-        normalize_catalog_selections(&mut config);
-        config.validate()?;
+        let config = recover(&config_path, "profile", read_profile)?;
         let history_path = config_directory.join("history.json");
-        let history = read_history(&history_path)?;
+        let history = recover(&history_path, "change history", |path| {
+            read_json(path, "change history").map(Option::unwrap_or_default)
+        })?;
         let state = Self {
             inner: Arc::new(Inner {
                 config_path,
                 history_path,
-                config: RwLock::new(config),
-                history: Mutex::new(history),
+                config: RwLock::new(config.value),
+                history: Mutex::new(history.value),
                 status: RwLock::new(EngineStatus::default()),
                 activity: RwLock::new(Vec::new()),
                 process_allowances: RwLock::new(HashSet::new()),
@@ -136,6 +179,9 @@ impl AppState {
             }),
         };
         state.save()?;
+        for problem in [config.problem, history.problem].into_iter().flatten() {
+            state.add_activity("Error", problem, false);
+        }
         Ok(state)
     }
 
@@ -450,6 +496,35 @@ mod tests {
                 .config()
                 .enforcement_enabled
         );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn invalid_files_are_set_aside_and_replaced_with_safe_defaults() {
+        let directory = temporary_directory();
+        fs::create_dir_all(&directory).unwrap();
+        let mut profile = serde_json::to_value(AppConfig {
+            enforcement_enabled: true,
+            ..AppConfig::default()
+        })
+        .unwrap();
+        profile["activeHoursEnd"] = serde_json::json!(99);
+        fs::write(directory.join("policy.json"), profile.to_string()).unwrap();
+        fs::write(directory.join("history.json"), "{ not json").unwrap();
+
+        let state = AppState::load(&directory).unwrap();
+
+        assert!(!state.config().enforcement_enabled);
+        assert_eq!(state.activity().len(), 2);
+        assert!(state.activity().iter().all(|event| !event.success));
+        let kept = fs::read_dir(&directory)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".invalid-"))
+            .count();
+        assert_eq!(kept, 2);
+        assert!(AppState::load(&directory).unwrap().activity().is_empty());
         fs::remove_dir_all(directory).unwrap();
     }
 
