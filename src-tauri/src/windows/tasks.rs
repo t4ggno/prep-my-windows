@@ -20,7 +20,7 @@ struct TaskState {
 
 #[derive(Debug, Default)]
 pub struct DisableOutcome {
-    pub disabled: u64,
+    pub disabled: Vec<&'static str>,
     pub errors: Vec<String>,
 }
 
@@ -113,7 +113,7 @@ pub fn disable(definitions: &[ScheduledTaskDefinition]) -> DisableOutcome {
     let mut refused = Vec::new();
     for definition in definitions {
         match disable_directly(definition.path) {
-            Ok(()) => outcome.disabled += 1,
+            Ok(()) => outcome.disabled.push(definition.id),
             Err(reason) => refused.push((definition.clone(), reason)),
         }
     }
@@ -145,7 +145,7 @@ pub fn disable(definitions: &[ScheduledTaskDefinition]) -> DisableOutcome {
                 definition.path
             ));
         } else {
-            outcome.disabled += 1;
+            outcome.disabled.push(definition.id);
         }
     }
     outcome

@@ -267,5 +267,6 @@ pub fn build(state: &AppState, system: SystemInfo) -> Snapshot {
         network_blocks,
         scheduled_tasks,
         activity: state.activity(),
+        reapplied: state.reapplied(),
     }
 }

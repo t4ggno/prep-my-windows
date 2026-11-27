@@ -72,9 +72,11 @@ const heroIcons = {
 export function OverviewView({
   snapshot,
   onNavigate,
+  onShowReapplied,
 }: {
   snapshot: Snapshot;
   onNavigate: (section: Section) => void;
+  onShowReapplied: () => void;
 }) {
   const now = useNow();
   const state = engineState(snapshot.status, snapshot.settings.enforcementEnabled);
@@ -131,9 +133,9 @@ export function OverviewView({
         />
         <Metric
           label="Changes reapplied"
-          value={snapshot.status.repairedTotal}
+          value={snapshot.status.reappliedTotal}
           icon={RotateCcw}
-          onClick={() => onNavigate("activity")}
+          onClick={onShowReapplied}
         />
       </section>
 

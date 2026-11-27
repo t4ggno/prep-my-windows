@@ -1,5 +1,6 @@
 mod app_update;
 mod catalog;
+mod change_history;
 mod commands;
 mod engine;
 mod events;

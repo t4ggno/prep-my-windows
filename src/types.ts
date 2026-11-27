@@ -17,7 +17,7 @@ export type CatalogSection =
 export interface EngineStatus {
   busy: boolean;
   lastEnforcedAt: string | null;
-  repairedTotal: number;
+  reappliedTotal: number;
   killedTotal: number;
 }
 
@@ -134,7 +134,20 @@ export interface ActivityEvent {
   timestamp: string;
   kind: string;
   message: string;
+  details: string[];
   success: boolean;
+}
+
+export type ChangeSection = "setting" | "app" | "network" | "scheduledTask" | "autostart";
+
+export interface ReappliedChange {
+  key: string;
+  name: string;
+  section: ChangeSection;
+  reverts: number;
+  lastRevertedAt: string;
+  lastFound: string;
+  wanted: string;
 }
 
 export interface AppSettings {
@@ -163,6 +176,7 @@ export interface Snapshot {
   networkBlocks: NetworkItem[];
   scheduledTasks: ScheduledTaskItem[];
   activity: ActivityEvent[];
+  reapplied: ReappliedChange[];
 }
 
 export interface LiveState {

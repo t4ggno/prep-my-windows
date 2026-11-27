@@ -5,6 +5,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::catalog;
+use crate::change_history::ChangeSection;
 use crate::engine;
 use crate::models::{
     AddProcessRuleRequest, AppConfig, AutostartEntry, ProcessInfo, ProcessRule, RuntimeSettings,
@@ -34,6 +35,21 @@ impl CatalogSection {
             Self::Packages => catalog::packages().iter().any(|item| item.id == id),
             Self::NetworkBlocks => catalog::network_blocks().iter().any(|item| item.id == id),
             Self::ScheduledTasks => catalog::scheduled_tasks().iter().any(|item| item.id == id),
+        }
+    }
+
+    fn change_key(self, id: &str) -> String {
+        match self {
+            Self::Policies => ChangeSection::Setting.key(id),
+            Self::Packages => catalog::packages()
+                .into_iter()
+                .find(|item| item.id == id)
+                .map_or_else(
+                    || ChangeSection::App.key(id),
+                    |item| ChangeSection::App.key(item.pattern),
+                ),
+            Self::NetworkBlocks => ChangeSection::Network.key(id),
+            Self::ScheduledTasks => ChangeSection::ScheduledTask.key(id),
         }
     }
 }
@@ -76,6 +92,7 @@ async fn replace_profile(
         update_with_startup_task(&state, config.start_with_windows, |state| {
             state.replace_config(config)
         })?;
+        state.release_all_changes()?;
         engine::enforce_all(&app, &state)
     })
     .await?;
@@ -105,6 +122,13 @@ pub async fn set_catalog_items(
 ) -> Result<(), String> {
     if ids.is_empty() || !ids.iter().all(|id| section.contains(id)) {
         return Err("Unknown catalog item".to_owned());
+    }
+    if !enabled {
+        let keys = ids
+            .iter()
+            .map(|id| section.change_key(id))
+            .collect::<Vec<_>>();
+        state.release_changes(keys.iter().map(String::as_str))?;
     }
     state.update_config(|config| {
         let values = match section {
@@ -295,6 +319,7 @@ pub async fn block_autostart(
 
 #[tauri::command]
 pub fn remove_autostart_rule(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
+    state.release_changes([ChangeSection::Autostart.key(&id).as_str()])?;
     state.update_config(|config| {
         config
             .blocked_autostarts
@@ -335,6 +360,7 @@ pub fn remove_custom_package(
     state: tauri::State<'_, AppState>,
     package_name: String,
 ) -> Result<(), String> {
+    state.release_changes([ChangeSection::App.key(&package_name).as_str()])?;
     state.update_config(|config| {
         config
             .custom_packages
@@ -372,6 +398,9 @@ pub async fn set_enforcement_enabled(
 ) -> Result<(), String> {
     let state = state.inner().clone();
     state.update_config(|config| config.enforcement_enabled = enabled)?;
+    if !enabled {
+        state.release_all_changes()?;
+    }
     state.add_activity(
         "Enforcement",
         if enabled {

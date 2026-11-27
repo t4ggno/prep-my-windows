@@ -4,6 +4,7 @@ use parking_lot::MutexGuard;
 use tauri::AppHandle;
 
 use crate::catalog;
+use crate::change_history::{AppliedChange, ChangeSection};
 use crate::events::publish_live_state;
 use crate::models::{
     PolicyDefinition, RegistryValue, SupportRequirement, SystemSupport, TaskStatus,
@@ -20,22 +21,26 @@ const MONITOR_READY_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Default)]
 struct EnforcementOutcome {
-    repaired: u64,
+    changes: Vec<AppliedChange>,
     errors: Vec<String>,
 }
 
 impl EnforcementOutcome {
     fn merge(&mut self, other: Self) {
-        self.repaired += other.repaired;
+        self.changes.extend(other.changes);
         self.errors.extend(other.errors);
     }
 
     fn complete(self, state: &AppState) -> u64 {
+        let applied = self.changes.len() as u64;
+        if let Err(error) = state.record_changes(self.changes) {
+            state.report_problem(error);
+        }
         for error in self.errors {
             state.report_problem(error);
         }
-        state.complete_enforcement(self.repaired);
-        self.repaired
+        state.complete_enforcement();
+        applied
     }
 }
 
@@ -54,36 +59,27 @@ fn disabled_service_name(definition: &PolicyDefinition) -> Option<&'static str> 
         .filter(|_| definition.desired == RegistryValue::Dword(4))
 }
 
-fn enforce_policy(definition: &PolicyDefinition) -> Result<bool, String> {
-    let (Some(service), RegistryValue::Dword(start_type)) =
-        (definition.service_name(), &definition.desired)
-    else {
-        return registry::enforce_policy(definition);
-    };
-    if definition
-        .desired
-        .is_satisfied_by(registry::read_policy(definition)?.as_deref())
-    {
-        return Ok(false);
+fn enforce_policy(definition: &PolicyDefinition) -> Result<Option<String>, String> {
+    let current = registry::read_policy(definition)?;
+    if definition.desired.is_satisfied_by(current.as_deref()) {
+        return Ok(None);
     }
-    services::set_start_type(service, *start_type)
-        .map_err(|error| format!("Could not enforce {}: {error}", definition.name))?;
-    Ok(true)
-}
-
-fn reapplied_message(names: &[&str]) -> String {
-    if names.len() <= 3 {
-        format!("Reapplied {}", names.join(", "))
-    } else {
-        format!("Reapplied {} settings", names.len())
+    match (definition.service_name(), &definition.desired) {
+        (Some(service), RegistryValue::Dword(start_type)) => {
+            services::set_start_type(service, *start_type)
+                .map_err(|error| format!("Could not enforce {}: {error}", definition.name))?;
+        }
+        _ => {
+            registry::enforce_policy(definition)?;
+        }
     }
+    Ok(Some(definition.value_label(current.as_deref())))
 }
 
 fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
     let config = state.config();
-    let mut repaired = 0_u64;
+    let mut changes = Vec::new();
     let mut errors = Vec::new();
-    let mut repaired_policy_names = Vec::new();
     let support = windows::support_info();
     if let Err(error) = &support {
         errors.push(error.clone());
@@ -101,32 +97,49 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
             continue;
         }
         match enforce_policy(&definition) {
-            Ok(true) => {
-                repaired += 1;
-                repaired_policy_names.push(definition.name);
+            Ok(Some(found)) => {
+                changes.push(AppliedChange::new(
+                    ChangeSection::Setting,
+                    definition.id,
+                    definition.name,
+                    found,
+                    definition.wanted_label(),
+                ));
                 if let Some(service) = disabled_service_name(&definition)
                     && let Err(error) = services::stop(service)
                 {
                     errors.push(error);
                 }
             }
-            Ok(false) => {}
+            Ok(None) => {}
             Err(error) => errors.push(error),
         }
     }
 
     for definition in catalog::system_settings() {
-        if !config.policies.get(definition.id).copied().unwrap_or(false) {
+        if !config.policies.get(definition.id).copied().unwrap_or(false)
+            || !is_supported(definition.support, &support)
+        {
             continue;
         }
-        if !is_supported(definition.support, &support) {
+        let before = match system_settings::read(definition.kind) {
+            Ok(before) => before,
+            Err(error) => {
+                errors.push(error);
+                continue;
+            }
+        };
+        if !before.available || before.compliant {
             continue;
         }
         match system_settings::enforce(definition.kind) {
-            Ok(true) => {
-                repaired += 1;
-                repaired_policy_names.push(definition.name);
-            }
+            Ok(true) => changes.push(AppliedChange::new(
+                ChangeSection::Setting,
+                definition.id,
+                definition.name,
+                before.current,
+                before.wanted,
+            )),
             Ok(false) => {}
             Err(error) => errors.push(error),
         }
@@ -142,35 +155,44 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
                 .unwrap_or(false)
         })
         .collect::<Vec<_>>();
-    match hosts::enforce(&enabled_network) {
-        Ok(true) => repaired += 1,
-        Ok(false) => {}
+    match hosts::statuses(&enabled_network) {
+        Ok(blocked) => match hosts::enforce(&enabled_network) {
+            Ok(true) => changes.extend(
+                enabled_network
+                    .iter()
+                    .zip(blocked)
+                    .filter(|(_, blocked)| !blocked)
+                    .map(|(definition, _)| {
+                        AppliedChange::new(
+                            ChangeSection::Network,
+                            definition.id,
+                            definition.domain,
+                            "Allowed",
+                            "Blocked",
+                        )
+                    }),
+            ),
+            Ok(false) => {}
+            Err(error) => errors.push(error),
+        },
         Err(error) => errors.push(error),
     }
 
-    let mut autostart_repairs = 0;
     for rule in &config.blocked_autostarts {
         match autostart::enforce_rule(rule) {
-            Ok(true) => {
-                repaired += 1;
-                autostart_repairs += 1;
-            }
+            Ok(true) => changes.push(AppliedChange::new(
+                ChangeSection::Autostart,
+                &rule.id,
+                rule.name.as_str(),
+                "Active",
+                "Blocked",
+            )),
             Ok(false) => {}
             Err(error) => errors.push(error),
         }
     }
 
-    if !repaired_policy_names.is_empty() {
-        state.add_activity("Policy", reapplied_message(&repaired_policy_names), true);
-    }
-    if autostart_repairs > 0 {
-        state.add_activity(
-            "Autostart",
-            format!("Removed {autostart_repairs} autostart entries"),
-            true,
-        );
-    }
-    EnforcementOutcome { repaired, errors }
+    EnforcementOutcome { changes, errors }
 }
 
 fn run_enforcement(
@@ -195,9 +217,35 @@ pub fn enforce_runtime(app: &AppHandle, state: &AppState) -> Result<u64, String>
     })
 }
 
+fn removed_package_changes(removed: Vec<String>) -> Vec<AppliedChange> {
+    let definitions = catalog::packages();
+    let mut changes = Vec::<AppliedChange>::new();
+    for package_name in removed {
+        let key = ChangeSection::App.key(&package_name);
+        if changes.iter().any(|change| change.key == key) {
+            continue;
+        }
+        let name = definitions
+            .iter()
+            .find(|definition| definition.pattern.eq_ignore_ascii_case(&package_name))
+            .map_or_else(
+                || package_name.clone(),
+                |definition| definition.name.to_owned(),
+            );
+        changes.push(AppliedChange::new(
+            ChangeSection::App,
+            &package_name,
+            name,
+            "Installed",
+            "Removed",
+        ));
+    }
+    changes
+}
+
 fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
     let config = state.config();
-    let mut repaired = 0_u64;
+    let mut changes = Vec::new();
     let mut errors = Vec::new();
 
     let task_definitions = catalog::scheduled_tasks();
@@ -221,7 +269,20 @@ fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
         .collect::<Vec<_>>();
     if !pending_tasks.is_empty() {
         let disabled = tasks::disable(&pending_tasks);
-        repaired += disabled.disabled;
+        changes.extend(
+            pending_tasks
+                .iter()
+                .filter(|definition| disabled.disabled.contains(&definition.id))
+                .map(|definition| {
+                    AppliedChange::new(
+                        ChangeSection::ScheduledTask,
+                        definition.id,
+                        definition.name,
+                        "Enabled",
+                        "Disabled",
+                    )
+                }),
+        );
         errors.extend(disabled.errors);
     }
 
@@ -236,29 +297,17 @@ fn enforce_slow_inner(state: &AppState) -> EnforcementOutcome {
 
     match packages::enforce(&package_names) {
         Ok(result) => {
-            repaired += result.removed.len() as u64;
-            if !result.removed.is_empty() {
-                state.add_activity(
-                    "Apps",
-                    format!("Removed {} app packages", result.removed.len()),
-                    true,
-                );
-            }
+            changes.extend(removed_package_changes(result.removed));
             errors.extend(result.errors);
         }
         Err(error) => errors.push(error),
     }
 
-    match startup_task::configure(config.start_with_windows) {
-        Ok(true) => repaired += 1,
-        Ok(false) => {}
-        Err(error) => errors.push(error),
+    if let Err(error) = startup_task::configure(config.start_with_windows) {
+        errors.push(error);
     }
 
-    if repaired > 0 {
-        state.add_activity("Enforcement", format!("Applied {repaired} changes"), true);
-    }
-    EnforcementOutcome { repaired, errors }
+    EnforcementOutcome { changes, errors }
 }
 
 pub fn enforce_slow(app: &AppHandle, state: &AppState) -> Result<u64, String> {
@@ -326,7 +375,7 @@ pub fn start(app: AppHandle, state: AppState) -> Result<(), String> {
 mod tests {
     use super::{
         EnforcementOutcome, RUNTIME_RECONCILIATION_INTERVAL, SLOW_RECONCILIATION_INTERVAL,
-        disabled_service_name, reapplied_message,
+        disabled_service_name, removed_package_changes,
     };
     use crate::catalog;
 
@@ -345,26 +394,31 @@ mod tests {
     }
 
     #[test]
-    fn names_a_few_reapplied_settings() {
-        assert_eq!(reapplied_message(&["A", "B"]), "Reapplied A, B");
-        assert_eq!(
-            reapplied_message(&["A", "B", "C", "D"]),
-            "Reapplied 4 settings"
-        );
+    fn names_removed_packages_once_with_their_catalog_name() {
+        let changes = removed_package_changes(vec![
+            "Microsoft.BingNews".to_owned(),
+            "Microsoft.BingNews".to_owned(),
+            "Contoso.Custom".to_owned(),
+        ]);
+
+        assert_eq!(changes.len(), 2);
+        assert_ne!(changes[0].name, "Microsoft.BingNews");
+        assert_eq!(changes[1].name, "Contoso.Custom");
+        assert_eq!(changes[1].key, "app:contoso.custom");
     }
 
     #[test]
     fn combined_enforcement_keeps_earlier_errors() {
         let mut combined = EnforcementOutcome {
-            repaired: 2,
+            changes: removed_package_changes(vec!["A".to_owned()]),
             errors: vec!["runtime error".to_owned()],
         };
         combined.merge(EnforcementOutcome {
-            repaired: 3,
+            changes: removed_package_changes(vec!["B".to_owned(), "C".to_owned()]),
             errors: Vec::new(),
         });
 
-        assert_eq!(combined.repaired, 5);
+        assert_eq!(combined.changes.len(), 3);
         assert_eq!(combined.errors, ["runtime error"]);
     }
 

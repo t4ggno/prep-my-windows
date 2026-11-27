@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::change_history::ReappliedChange;
+
 pub const DEFAULT_ACTIVE_HOURS_START: u8 = 22;
 pub const DEFAULT_ACTIVE_HOURS_END: u8 = 7;
 
@@ -111,6 +113,21 @@ impl PolicyDefinition {
         self.choices
             .iter()
             .find(|choice| choice.value == self.desired)
+    }
+
+    pub fn wanted_label(&self) -> String {
+        self.selected_choice()
+            .map_or_else(|| self.desired.label(), |choice| choice.label.to_owned())
+    }
+
+    pub fn value_label(&self, current: Option<&str>) -> String {
+        self.choices
+            .iter()
+            .find(|choice| choice.value.is_satisfied_by(current))
+            .map_or_else(
+                || current.unwrap_or("Not set").to_owned(),
+                |choice| choice.label.to_owned(),
+            )
     }
 }
 
@@ -431,6 +448,7 @@ pub struct ActivityEvent {
     pub timestamp: String,
     pub kind: String,
     pub message: String,
+    pub details: Vec<String>,
     pub success: bool,
 }
 
@@ -439,7 +457,7 @@ pub struct ActivityEvent {
 pub struct EngineStatus {
     pub busy: bool,
     pub last_enforced_at: Option<String>,
-    pub repaired_total: u64,
+    pub reapplied_total: u64,
     pub killed_total: u64,
 }
 
@@ -465,6 +483,7 @@ pub struct Snapshot {
     pub network_blocks: Vec<NetworkView>,
     pub scheduled_tasks: Vec<ScheduledTaskView>,
     pub activity: Vec<ActivityEvent>,
+    pub reapplied: Vec<ReappliedChange>,
 }
 
 #[derive(Clone, Debug, Serialize)]

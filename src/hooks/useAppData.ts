@@ -89,7 +89,7 @@ export function useAppData() {
       if (
         previous &&
         ((previous.busy && !live.status.busy) ||
-          previous.repairedTotal !== live.status.repairedTotal)
+          previous.reappliedTotal !== live.status.reappliedTotal)
       ) {
         refreshWhenVisible();
       }

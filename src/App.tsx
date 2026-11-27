@@ -11,7 +11,7 @@ import { useAppData } from "@/hooks/useAppData";
 import { useDesktopUpdate } from "@/hooks/useDesktopUpdate";
 import { useResource } from "@/hooks/useResource";
 import { errorMessage } from "@/lib/utils";
-import { ActivityView } from "@/views/ActivityView";
+import { type ActivityFilter, ActivityView } from "@/views/ActivityView";
 import { AppsView } from "@/views/AppsView";
 import { AutostartView } from "@/views/AutostartView";
 import { NetworkView } from "@/views/NetworkView";
@@ -79,6 +79,7 @@ export default function App() {
     useAppData();
   const updater = useDesktopUpdate();
   const [section, setSection] = useState<Section>("overview");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [confirmation, setConfirmation] = useState<ConfirmRequest | null>(null);
   const reportError = useCallback((caught: unknown) => setError(errorMessage(caught)), [setError]);
   const autostarts = useResource(api.listAutostarts, reportError);
@@ -288,7 +289,16 @@ export default function App() {
           </button>
         </div>
       )}
-      {section === "overview" && <OverviewView snapshot={snapshot} onNavigate={setSection} />}
+      {section === "overview" && (
+        <OverviewView
+          snapshot={snapshot}
+          onNavigate={setSection}
+          onShowReapplied={() => {
+            setActivityFilter("reapplied");
+            setSection("activity");
+          }}
+        />
+      )}
       {section === "policy" && (
         <PolicyView
           policies={snapshot.policies}
@@ -343,7 +353,13 @@ export default function App() {
         />
       )}
       {section === "activity" && (
-        <ActivityView activity={snapshot.activity} onClear={clearActivity} />
+        <ActivityView
+          activity={snapshot.activity}
+          reapplied={snapshot.reapplied}
+          filter={activityFilter}
+          onFilterChange={setActivityFilter}
+          onClear={clearActivity}
+        />
       )}
       {section === "settings" && (
         <SettingsView
