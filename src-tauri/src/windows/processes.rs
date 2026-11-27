@@ -1,10 +1,15 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde::Deserialize;
 use sysinfo::{Pid, Process, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+use windows_sys::Win32::Foundation::{CloseHandle, ERROR_INVALID_PARAMETER, WAIT_OBJECT_0};
+use windows_sys::Win32::System::Threading::{
+    OpenProcess, PROCESS_SYNCHRONIZE, PROCESS_TERMINATE, TerminateProcess, WaitForSingleObject,
+};
 use wmi::WMIConnection;
 
 use crate::models::{ProcessInfo, ProcessRule};
@@ -101,6 +106,27 @@ fn allowance_key(rule: &ProcessRule) -> String {
     }
 }
 
+fn terminate(pid: Pid) -> io::Result<bool> {
+    let handle = unsafe { OpenProcess(PROCESS_TERMINATE | PROCESS_SYNCHRONIZE, 0, pid.as_u32()) };
+    if handle.is_null() {
+        let error = io::Error::last_os_error();
+        return if error.raw_os_error() == Some(ERROR_INVALID_PARAMETER as i32) {
+            Ok(false)
+        } else {
+            Err(error)
+        };
+    }
+    let result = if unsafe { TerminateProcess(handle, 1) } != 0 {
+        Ok(true)
+    } else if unsafe { WaitForSingleObject(handle, 0) } == WAIT_OBJECT_0 {
+        Ok(false)
+    } else {
+        Err(io::Error::last_os_error())
+    };
+    unsafe { CloseHandle(handle) };
+    result
+}
+
 fn stop_process(
     pid: Pid,
     process: &Process,
@@ -130,8 +156,10 @@ fn stop_process(
         arguments: process.cmd().iter().skip(1).cloned().collect(),
         working_directory: process.cwd().map(Path::to_owned),
     });
-    if !process.kill() {
-        return Err(format!("Could not stop {process_name} (process {pid})"));
+    match terminate(pid) {
+        Ok(true) => {}
+        Ok(false) => return Ok(None),
+        Err(error) => return Err(format!("Could not stop {process_name}: {error}")),
     }
 
     Ok(Some(StoppedProcess {
