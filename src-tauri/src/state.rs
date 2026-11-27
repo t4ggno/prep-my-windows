@@ -13,7 +13,7 @@ use serde::de::DeserializeOwned;
 
 use crate::catalog;
 use crate::change_history::{self, AppliedChange, ChangeHistory, ReappliedChange};
-use crate::models::{ActivityEvent, AppConfig, EngineStatus, InstalledPackage};
+use crate::models::{ActivityEvent, AppConfig, EngineStatus, InstalledPackage, ProcessRule};
 
 const PROBLEM_REPEAT_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
@@ -57,6 +57,8 @@ fn normalize_catalog_selections(config: &mut AppConfig) {
             .map(|item| (item.id, true)),
     );
 
+    sync_built_in_process_rules(&mut config.process_rules);
+
     let policies = catalog::policies();
     config.policy_choices.retain(|id, choice| {
         policies.iter().any(|definition| {
@@ -66,6 +68,29 @@ fn normalize_catalog_selections(config: &mut AppConfig) {
                     .is_some_and(|choice| choice.value != definition.desired)
         })
     });
+}
+
+fn sync_built_in_process_rules(rules: &mut Vec<ProcessRule>) {
+    let saved = rules
+        .iter()
+        .filter(|rule| rule.built_in)
+        .map(|rule| (rule.id.clone(), rule.enabled))
+        .collect::<HashMap<_, _>>();
+    let custom = rules
+        .drain(..)
+        .filter(|rule| !rule.built_in)
+        .collect::<Vec<_>>();
+    rules.extend(
+        catalog::default_process_rules()
+            .into_iter()
+            .map(|mut rule| {
+                if let Some(enabled) = saved.get(&rule.id) {
+                    rule.enabled = *enabled;
+                }
+                rule
+            }),
+    );
+    rules.extend(custom);
 }
 
 fn write_json(path: &Path, value: &impl Serialize, label: &str) -> Result<(), String> {
@@ -358,7 +383,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::{AppState, normalize_catalog_selections};
-    use crate::models::AppConfig;
+    use crate::models::{AppConfig, ProcessRule};
 
     fn temporary_directory() -> std::path::PathBuf {
         std::env::temp_dir().join(format!("prep-my-windows-test-{}", Uuid::new_v4()))
@@ -392,6 +417,50 @@ mod tests {
         assert_eq!(config.packages.get("clipchamp"), Some(&false));
         assert_eq!(config.scheduled_tasks.get("device-census"), Some(&true));
         assert_eq!(config.network_blocks.get("events"), Some(&true));
+    }
+
+    #[test]
+    fn syncs_built_in_process_rules_and_keeps_custom_rules() {
+        let mut config = AppConfig::default();
+        config
+            .process_rules
+            .retain(|rule| rule.id != "built-in-steam");
+        for rule in &mut config.process_rules {
+            if rule.id == "built-in-onedrive" {
+                rule.enabled = false;
+                rule.name = "Old name".to_owned();
+            }
+        }
+        config.process_rules.push(ProcessRule {
+            id: "built-in-removed".to_owned(),
+            name: "Removed".to_owned(),
+            executable_name: "removed.exe".to_owned(),
+            executable_path: None,
+            enabled: true,
+            built_in: true,
+        });
+        config.process_rules.push(ProcessRule {
+            id: "custom".to_owned(),
+            name: "Custom".to_owned(),
+            executable_name: "custom.exe".to_owned(),
+            executable_path: None,
+            enabled: true,
+            built_in: false,
+        });
+
+        normalize_catalog_selections(&mut config);
+
+        let find = |id: &str| config.process_rules.iter().find(|rule| rule.id == id);
+        assert_eq!(find("built-in-steam").map(|rule| rule.enabled), Some(false));
+        let onedrive = find("built-in-onedrive").unwrap();
+        assert!(!onedrive.enabled);
+        assert_eq!(onedrive.name, "Microsoft OneDrive");
+        assert!(find("built-in-removed").is_none());
+        assert!(find("custom").is_some());
+        assert_eq!(
+            config.process_rules.len(),
+            crate::catalog::default_process_rules().len() + 1
+        );
     }
 
     #[test]

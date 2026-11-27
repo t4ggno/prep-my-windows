@@ -132,15 +132,19 @@ export function ProcessesView({
               onCheckedChange={(enabled) => onToggle(rule.id, enabled)}
               label={`Stop ${rule.name}`}
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={pending.has(`process-remove:${rule.id}`)}
-              onClick={() => onRemove(rule.id)}
-              aria-label={`Remove ${rule.name}`}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            {rule.builtIn ? (
+              <span />
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={pending.has(`process-remove:${rule.id}`)}
+                onClick={() => onRemove(rule.id)}
+                aria-label={`Remove ${rule.name}`}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
           </div>
         ))}
         {filteredRules.length === 0 && <EmptyState>No matching rules</EmptyState>}

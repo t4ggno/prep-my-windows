@@ -315,9 +315,18 @@ pub async fn add_process_rule(
 
 #[tauri::command]
 pub fn remove_process_rule(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
-    state.update_config(|config| {
+    state.try_update_config(|config| {
+        let rule = config
+            .process_rules
+            .iter()
+            .find(|rule| rule.id == id)
+            .ok_or_else(|| "Unknown process rule".to_owned())?;
+        if rule.built_in {
+            return Err("Built-in rules can only be turned off".to_owned());
+        }
         config.process_rules.retain(|rule| rule.id != id);
         config.muted_process_notifications.remove(&id);
+        Ok(())
     })
 }
 

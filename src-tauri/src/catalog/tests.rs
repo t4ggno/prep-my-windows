@@ -75,7 +75,24 @@ fn default_profile_follows_catalog_defaults() {
     assert!(config.packages.values().all(|enabled| *enabled));
     assert!(config.network_blocks.values().all(|enabled| *enabled));
     assert!(config.scheduled_tasks.values().all(|enabled| *enabled));
-    assert!(config.process_rules.iter().all(|rule| rule.enabled));
+    assert!(config.process_rules.iter().all(|rule| rule.built_in));
+    for (id, enabled) in [
+        ("built-in-onedrive", true),
+        ("built-in-widgets", true),
+        ("built-in-steam", false),
+        ("built-in-discord", false),
+        ("built-in-zoom", false),
+    ] {
+        assert_eq!(
+            config
+                .process_rules
+                .iter()
+                .find(|rule| rule.id == id)
+                .map(|rule| rule.enabled),
+            Some(enabled),
+            "{id}"
+        );
+    }
 }
 
 #[test]

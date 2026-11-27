@@ -75,7 +75,7 @@ mod tests;
 mod update;
 mod usability;
 
-pub use apps::packages;
+pub use apps::{default_process_rules, packages};
 pub use network::network_blocks;
 pub use system::system_settings;
 pub use tasks::scheduled_tasks;
@@ -147,7 +147,7 @@ impl Default for AppConfig {
                 .into_iter()
                 .map(|item| (item.id.to_owned(), true))
                 .collect::<BTreeMap<_, _>>(),
-            process_rules: apps::default_process_rules(),
+            process_rules: default_process_rules(),
             muted_process_notifications: Default::default(),
             custom_packages: Vec::new(),
             blocked_autostarts: Vec::new(),

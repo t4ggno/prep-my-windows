@@ -183,61 +183,72 @@ pub fn packages() -> Vec<PackageDefinition> {
     .collect()
 }
 
-pub(super) fn default_process_rules() -> Vec<ProcessRule> {
-    [
-        ("onedrive", "Microsoft OneDrive", "OneDrive.exe"),
-        ("teams", "Microsoft Teams", "ms-teams.exe"),
-        ("teams-classic", "Microsoft Teams classic", "Teams.exe"),
-        ("widgets", "Windows Widgets", "Widgets.exe"),
-        (
-            "widget-service",
-            "Windows Widget Service",
-            "WidgetService.exe",
-        ),
-        ("copilot", "Microsoft Copilot", "Copilot.exe"),
-        ("phone-link", "Phone Link", "PhoneExperienceHost.exe"),
-        ("game-bar", "Xbox Game Bar", "GameBar.exe"),
-        (
-            "game-bar-server",
-            "Xbox Game Bar server",
-            "GameBarFTServer.exe",
-        ),
-        ("discord", "Discord", "Discord.exe"),
-        ("spotify", "Spotify", "Spotify.exe"),
-        ("steam", "Steam", "steam.exe"),
-        ("epic", "Epic Games Launcher", "EpicGamesLauncher.exe"),
-        ("battle-net", "Battle.net", "Battle.net.exe"),
-        (
-            "creative-cloud",
-            "Adobe Creative Cloud",
-            "Creative Cloud.exe",
-        ),
-        (
-            "adobe-service",
-            "Adobe Desktop Service",
-            "Adobe Desktop Service.exe",
-        ),
-        ("ccx-process", "Adobe CCX Process", "CCXProcess.exe"),
-        (
-            "adobe-collab",
-            "Adobe Collaboration Synchronizer",
-            "AdobeCollabSync.exe",
-        ),
-        ("dropbox", "Dropbox", "Dropbox.exe"),
-        ("google-drive", "Google Drive", "GoogleDriveFS.exe"),
-        ("slack", "Slack", "slack.exe"),
-        ("notion", "Notion", "Notion.exe"),
-        ("whatsapp", "WhatsApp", "WhatsApp.exe"),
-        ("zoom", "Zoom", "Zoom.exe"),
-    ]
-    .into_iter()
-    .map(|(id, name, executable_name)| ProcessRule {
-        id: format!("built-in-{id}"),
-        name: name.to_owned(),
-        executable_name: executable_name.to_owned(),
-        executable_path: None,
-        enabled: true,
-        built_in: true,
-    })
-    .collect()
+const MICROSOFT_PROCESSES: &[(&str, &str, &str)] = &[
+    ("onedrive", "Microsoft OneDrive", "OneDrive.exe"),
+    ("teams", "Microsoft Teams", "ms-teams.exe"),
+    ("teams-classic", "Microsoft Teams classic", "Teams.exe"),
+    ("widgets", "Windows Widgets", "Widgets.exe"),
+    (
+        "widget-service",
+        "Windows Widget Service",
+        "WidgetService.exe",
+    ),
+    ("copilot", "Microsoft Copilot", "Copilot.exe"),
+    ("phone-link", "Phone Link", "PhoneExperienceHost.exe"),
+    ("game-bar", "Xbox Game Bar", "GameBar.exe"),
+    (
+        "game-bar-server",
+        "Xbox Game Bar server",
+        "GameBarFTServer.exe",
+    ),
+];
+
+const THIRD_PARTY_PROCESSES: &[(&str, &str, &str)] = &[
+    ("discord", "Discord", "Discord.exe"),
+    ("spotify", "Spotify", "Spotify.exe"),
+    ("steam", "Steam", "steam.exe"),
+    ("epic", "Epic Games Launcher", "EpicGamesLauncher.exe"),
+    ("battle-net", "Battle.net", "Battle.net.exe"),
+    (
+        "creative-cloud",
+        "Adobe Creative Cloud",
+        "Creative Cloud.exe",
+    ),
+    (
+        "adobe-service",
+        "Adobe Desktop Service",
+        "Adobe Desktop Service.exe",
+    ),
+    ("ccx-process", "Adobe CCX Process", "CCXProcess.exe"),
+    (
+        "adobe-collab",
+        "Adobe Collaboration Synchronizer",
+        "AdobeCollabSync.exe",
+    ),
+    ("dropbox", "Dropbox", "Dropbox.exe"),
+    ("google-drive", "Google Drive", "GoogleDriveFS.exe"),
+    ("slack", "Slack", "slack.exe"),
+    ("notion", "Notion", "Notion.exe"),
+    ("whatsapp", "WhatsApp", "WhatsApp.exe"),
+    ("zoom", "Zoom", "Zoom.exe"),
+];
+
+pub fn default_process_rules() -> Vec<ProcessRule> {
+    let rules = |definitions: &[(&str, &str, &str)], enabled: bool| {
+        definitions
+            .iter()
+            .map(|&(id, name, executable_name)| ProcessRule {
+                id: format!("built-in-{id}"),
+                name: name.to_owned(),
+                executable_name: executable_name.to_owned(),
+                executable_path: None,
+                enabled,
+                built_in: true,
+            })
+            .collect::<Vec<_>>()
+    };
+    rules(MICROSOFT_PROCESSES, true)
+        .into_iter()
+        .chain(rules(THIRD_PARTY_PROCESSES, false))
+        .collect()
 }
