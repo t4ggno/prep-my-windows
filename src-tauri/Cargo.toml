@@ -1,6 +1,6 @@
 [package]
 name = "prep-my-windows"
-version = "1.4.0"
+version = "1.4.1"
 description = "Enforce a personal Windows 11 policy"
 authors = ["Machdoch"]
 edition = "2024"
