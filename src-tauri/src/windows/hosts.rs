@@ -61,8 +61,13 @@ pub fn enforce(definitions: &[NetworkDefinition]) -> Result<bool, String> {
         return Ok(false);
     }
 
-    fs::write(&path, wanted)
-        .map_err(|error| format!("Could not write {}: {error}", path.display()))?;
+    let temporary_path = path.with_extension("prep-my-windows.tmp");
+    fs::write(&temporary_path, wanted)
+        .and_then(|()| fs::rename(&temporary_path, &path))
+        .map_err(|error| {
+            let _ = fs::remove_file(&temporary_path);
+            format!("Could not write {}: {error}", path.display())
+        })?;
     Ok(true)
 }
 
