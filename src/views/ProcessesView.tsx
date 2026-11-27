@@ -122,6 +122,7 @@ export function ProcessesView({
             <RuleSwitch
               checked={!muted.has(rule.id)}
               pending={pending.has(`notify:${rule.id}`)}
+              disabled={!rule.enabled}
               onCheckedChange={(notify) => onNotificationsMuted(rule.id, !notify)}
               label={`Notify when ${rule.name} is stopped`}
             />
