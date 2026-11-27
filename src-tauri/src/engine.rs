@@ -66,6 +66,23 @@ fn disabled_service_name(definition: &PolicyDefinition) -> Option<&'static str> 
         .filter(|_| definition.desired == RegistryValue::Dword(4))
 }
 
+fn enforce_policy(definition: &PolicyDefinition) -> Result<bool, String> {
+    let (Some(service), RegistryValue::Dword(start_type)) =
+        (definition.service_name(), &definition.desired)
+    else {
+        return registry::enforce_policy(definition);
+    };
+    if definition
+        .desired
+        .is_satisfied_by(registry::read_policy(definition)?.as_deref())
+    {
+        return Ok(false);
+    }
+    services::set_start_type(service, *start_type)
+        .map_err(|error| format!("Could not enforce {}: {error}", definition.name))?;
+    Ok(true)
+}
+
 fn reapplied_message(names: &[&str]) -> String {
     if names.len() <= 3 {
         format!("Reapplied {}", names.join(", "))
@@ -95,7 +112,7 @@ fn enforce_runtime_inner(state: &AppState) -> EnforcementOutcome {
         {
             continue;
         }
-        match registry::enforce_policy(&definition) {
+        match enforce_policy(&definition) {
             Ok(true) => {
                 repaired += 1;
                 repaired_policy_names.push(definition.name);

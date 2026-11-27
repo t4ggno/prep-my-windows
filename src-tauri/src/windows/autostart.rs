@@ -337,7 +337,7 @@ fn disable_task(rule: &AutostartRule) -> Result<bool, String> {
 fn disable_service(rule: &AutostartRule) -> Result<bool, String> {
     let local_machine = RegKey::predef(HKEY_LOCAL_MACHINE);
     let path = format!(r"SYSTEM\CurrentControlSet\Services\{}", rule.location);
-    let key = match local_machine.open_subkey_with_flags(&path, KEY_READ | KEY_SET_VALUE) {
+    let key = match local_machine.open_subkey_with_flags(&path, KEY_READ) {
         Ok(key) => key,
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(false),
         Err(error) => return Err(format!("Could not open service {}: {error}", rule.name)),
@@ -346,7 +346,7 @@ fn disable_service(rule: &AutostartRule) -> Result<bool, String> {
     if start == 4 {
         return Ok(false);
     }
-    key.set_value("Start", &4_u32)
+    services::set_start_type(&rule.location, 4)
         .map_err(|error| format!("Could not disable service {}: {error}", rule.name))?;
     services::stop(&rule.location)?;
     Ok(true)
